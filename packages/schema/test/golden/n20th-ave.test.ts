@@ -38,16 +38,16 @@ describe("N 20th Ave golden record (05_SPIKE_FINDINGS.md)", () => {
       "05_SPIKE_FINDINGS.md, 'The soil percentages — an open discrepancy'",
     () => {
       // 013-20: 42.6% Kalkaska (dry) + 32.0% Au Gres + 24.4% Evart loam (wet) + 1.1% Montcalm (dry)
-      expect(PARCEL_013_20.dryWetAdjacency.dry_acres.value).toBeCloseTo(1.638, 3);
-      expect(PARCEL_013_20.dryWetAdjacency.wet_acres.value).toBeCloseTo(2.117, 3);
+      expect(PARCEL_013_20.dry_wet_adjacency.dry_acres.value).toBeCloseTo(1.638, 3);
+      expect(PARCEL_013_20.dry_wet_adjacency.wet_acres.value).toBeCloseTo(2.117, 3);
 
       // 009-00: 89.7% Kalkaska (dry) + 9.6% Roscommon + 0.8% Au Gres (wet)
-      expect(PARCEL_009_00.dryWetAdjacency.dry_acres.value).toBeCloseTo(2.839, 3);
-      expect(PARCEL_009_00.dryWetAdjacency.wet_acres.value).toBeCloseTo(0.328, 3);
+      expect(PARCEL_009_00.dry_wet_adjacency.dry_acres.value).toBeCloseTo(2.839, 3);
+      expect(PARCEL_009_00.dry_wet_adjacency.wet_acres.value).toBeCloseTo(0.328, 3);
 
       // 008-00: 27.6% Kalkaska (dry) + 36.3% Carbondale muck + 31.7% Au Gres + 4.4% Roscommon (wet)
-      expect(PARCEL_008_00.dryWetAdjacency.dry_acres.value).toBeCloseTo(2.872, 3);
-      expect(PARCEL_008_00.dryWetAdjacency.wet_acres.value).toBeCloseTo(7.549, 3);
+      expect(PARCEL_008_00.dry_wet_adjacency.dry_acres.value).toBeCloseTo(2.872, 3);
+      expect(PARCEL_008_00.dry_wet_adjacency.wet_acres.value).toBeCloseTo(7.549, 3);
     }
   );
 

@@ -37,7 +37,7 @@ describe("getLayer", () => {
   it("returns the matching entry", () => {
     const layer = getLayer("egle_mienviro_1");
     expect(layer.name).toBe("Cold/Cold Transitional Streams");
-    expect(layer.sourceType).toBe("continuous");
+    expect(layer.source_type).toBe("continuous");
   });
 
   it("throws a clear error for an unknown id", () => {

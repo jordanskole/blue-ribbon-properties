@@ -30,7 +30,7 @@ function makeCard(overrides: Partial<CardDef> = {}): CardDef {
         vintage: { as_of: "2026-08-27", source_type: "periodic" },
       },
     },
-    dryWetAdjacency: {
+    dry_wet_adjacency: {
       dry_acres: {
         value: 1.638,
         provenance: "inferred",
@@ -103,32 +103,32 @@ describe("validateCard", () => {
 
   it("rejects negative dry_acres", () => {
     const card = makeCard();
-    card.dryWetAdjacency.dry_acres.value = -1;
+    card.dry_wet_adjacency.dry_acres.value = -1;
     expect(validateCard(card)).toContain("dry_acres.value must not be negative, got -1");
   });
 
   it("rejects negative wet_acres", () => {
     const card = makeCard();
-    card.dryWetAdjacency.wet_acres.value = -1;
+    card.dry_wet_adjacency.wet_acres.value = -1;
     expect(validateCard(card)).toContain("wet_acres.value must not be negative, got -1");
   });
 
   it("flags dry_acres + wet_acres that don't sum to identity.acres within tolerance", () => {
     const card = makeCard();
-    card.dryWetAdjacency.wet_acres.value = 5; // 1.638 + 5 = 6.638, way off from 3.755
+    card.dry_wet_adjacency.wet_acres.value = 5; // 1.638 + 5 = 6.638, way off from 3.755
     const errors = validateCard(card);
     expect(errors.some((e) => e.includes("does not match identity.acres.value"))).toBe(true);
   });
 
   it("allows dry_acres + wet_acres within 0.01 ac of identity.acres", () => {
     const card = makeCard();
-    card.dryWetAdjacency.dry_acres.value = 1.64; // 1.64 + 2.117 = 3.757, within 0.01 of 3.755
+    card.dry_wet_adjacency.dry_acres.value = 1.64; // 1.64 + 2.117 = 3.757, within 0.01 of 3.755
     expect(validateCard(card)).toEqual([]);
   });
 
   it("skips the acreage-sum check when any of the three values is null", () => {
     const card = makeCard();
-    card.dryWetAdjacency.dry_acres.value = null;
+    card.dry_wet_adjacency.dry_acres.value = null;
     expect(validateCard(card)).toEqual([]);
   });
 

@@ -46,7 +46,7 @@ export const PARCEL_013_20: CardDef = {
       },
     },
   },
-  dryWetAdjacency: {
+  dry_wet_adjacency: {
     dry_acres: {
       value: 1.638,
       provenance: "inferred",
@@ -150,7 +150,7 @@ export const PARCEL_009_00: CardDef = {
       },
     },
   },
-  dryWetAdjacency: {
+  dry_wet_adjacency: {
     dry_acres: {
       value: 2.839,
       provenance: "inferred",
@@ -242,7 +242,7 @@ export const PARCEL_008_00: CardDef = {
       },
     },
   },
-  dryWetAdjacency: {
+  dry_wet_adjacency: {
     dry_acres: {
       value: 2.872,
       provenance: "inferred",

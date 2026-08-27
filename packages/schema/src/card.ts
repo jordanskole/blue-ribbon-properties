@@ -33,7 +33,7 @@ export interface WetlandFootprint {
 export interface CardDef {
   identity: ParcelIdentity;
   groundwater: GroundwaterExpression; // A1
-  dryWetAdjacency: DryWetAdjacency; // A2
+  dry_wet_adjacency: DryWetAdjacency; // A2
   relief_envelope_to_water_ft: Field<number>; // A3
   wetland: WetlandFootprint; // A4
   prominence_ft: Field<number>; // A5
@@ -49,7 +49,7 @@ const ACRES_TOLERANCE = 0.01;
 export function validateCard(card: CardDef): string[] {
   const errors = validateIdentity(card.identity);
 
-  const { dry_acres, wet_acres } = card.dryWetAdjacency;
+  const { dry_acres, wet_acres } = card.dry_wet_adjacency;
 
   if (dry_acres.value !== null && dry_acres.value < 0) {
     errors.push(`dry_acres.value must not be negative, got ${dry_acres.value}`);
