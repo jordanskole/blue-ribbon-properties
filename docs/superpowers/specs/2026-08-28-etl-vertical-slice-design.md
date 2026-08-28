@@ -49,16 +49,21 @@ loop actually works, checked against a case we already know the right answer to.
    computes the acreage** that ends up on the card. SDA does the *fetch-scoping*; DuckDB
    does the *math*.
 3. **Scope is "reproduce the golden fixture's non-null values," not "fill in everything."**
-   Target fields: `identity.parcel_id`, `identity.acres`, `groundwater.thermal_class` +
-   `groundwater.designated_trout_stream` (008-00 only — the spike found only that parcel
-   touches a mapped reach), and `dryWetAdjacency`'s `dry_acres`/`wet_acres`/
-   `dominant_dry_soil` (all three parcels). Everything the spike left `null`
-   (`flowing_wells_nearby`, `relief_envelope_to_water_ft`, `wetland_pct`,
-   `wetland_between_envelope_and_water`, `adjacent`, `prominence_ft`) stays `null` in this
-   pass — those each need a method the spike never finished (a corrected road-to-river
-   transect, a wetland overlay, a polygon-touch test, a per-parcel well-distance calc), and
-   solving four new methods in the same pass as proving the DuckDB-spatial approach would
-   turn a vertical slice into a second architectural project.
+   Target fields: `identity.parcel_id`, `identity.acres`, `groundwater.designated_trout_stream`
+   (`true` on 008-00 only — real, nearby layer-32 geometry; `false` on the other two), and
+   `dry_wet_adjacency`'s `dry_acres`/`wet_acres`/`dominant_dry_soil` (all three parcels).
+   **`groundwater.thermal_class` is `null` on all three parcels** (corrected 2026-08-28 —
+   the original claim of `"Cold stream"` on 008-00 was a name match on a different, distant
+   reach; MiEnviro layer 1 genuinely has no coverage near this parcel) — the ETL query still
+   needs to run the `ST_Intersects` check against layer 1, it should just correctly find
+   nothing here, which is itself part of what this vertical slice needs to get right.
+   Everything else the spike left `null` (`flowing_wells_nearby`,
+   `relief_envelope_to_water_ft`, `wetland_pct`, `wetland_between_envelope_and_water`,
+   `adjacent`, `prominence_ft`) stays `null` in this pass — those each need a method the
+   spike never finished (a corrected road-to-river transect, a wetland overlay, a
+   polygon-touch test, a per-parcel well-distance calc), and solving four new methods in the
+   same pass as proving the DuckDB-spatial approach would turn a vertical slice into a
+   second architectural project.
 4. **The acceptance test is the golden fixture already in `packages/schema`.** No new
    "expected values" get invented for this spec — the pipeline's output on N 20th Ave's
    three real parcels must equal `packages/schema/test/golden/n20th-ave.fixture.ts`'s
