@@ -13,7 +13,7 @@ public endpoints on 2026-08-27 unless noted.*
 | **1. Does MiEnviro layer 1 collapse funnel stages 0–1?** | ✅ **Yes — much broader.** | ~17,400 mi statewide vs. ~850 mi Blue Ribbon (~20×). `03_` demotes to a validation set. |
 | **2. Is the Wellogic artesian hypothesis real?** | ⚠️ **Partially.** | Flowing wells ARE a real, flagged, queryable signal. The *magnitude/interpolation* idea in `00_` is not supportable from this field — SWL is floored at zero. Coordinate quality is the dominant risk, exactly as feared. |
 | **3. Parcel reality check (2–3 counties)** | ⚠️ **Mixed, workably positive.** | Osceola and Roscommon both have free, public, no-auth ArcGIS parcel layers with real geometry. Missaukee's is token-gated. Regrid's ToS confirms geometry cannot be republished without written approval — Difference #1 is real. |
-| **Ground truth (N 20th Ave)** | ⚠️ **2 of 4 clean, 1 open discrepancy, 1 not reproduced.** | Coldwater classification and parcel count (**3**, not 2 — 013-20 + 009-00 + 008-00 = 17.34 ac ≈ 17.37) both check out cleanly. The 93%/66% soil percentages are real numbers from real hand-traced AOIs, but they land on different official parcels than the write-up says — unresolved, not fixed, see ⚠️⚠️ below. The 14-ft relief figure genuinely didn't reproduce, likely a bad transect line, not bad geology. |
+| **Ground truth (N 20th Ave)** | ⚠️ **1 of 4 clean, 1 open discrepancy, 2 not reproduced.** | Parcel count (**3**, not 2 — 013-20 + 009-00 + 008-00 = 17.34 ac ≈ 17.37) checks out cleanly. The 93%/66% soil percentages are real numbers from real hand-traced AOIs, but they land on different official parcels than the write-up says — unresolved, not fixed, see ⚠️⚠️ below. The 14-ft relief figure genuinely didn't reproduce, likely a bad transect line, not bad geology. **The "coldwater reach" claim also didn't reproduce, and was wrongly marked as reproduced in the original pass** — corrected 2026-08-28 after the ETL design work caught it: layer 1 has zero real coverage near this parcel, the original check was a name match, not a spatial one. Layer 32's designated-trout-stream status does hold up independently. |
 
 **None of the three questions came back hard-negative**, so nothing here stops the funnel.
 **The most important finding turned out to be architectural, not statistical: N 20th Ave is
@@ -84,8 +84,20 @@ That is not "barely broader" — it's a different search geography. Per `03_`'s 
 rule: **the Blue Ribbon list demotes to a seed/validation set, and the real search runs against
 layer 1.**
 
-**Ground truth:** the Middle Branch River (N 20th Ave's stream) is in layer 1, classified
-`TemperatureGradient = "Cold stream"`. ✅ Reproduced.
+**Ground truth — corrected 2026-08-28, this was wrong as first written:** the original claim
+here ("the Middle Branch River is in layer 1, classified `Cold stream`") came from a **name
+match, not a spatial one**. Michigan has exactly one "Middle Branch River" entity in layer 1
+statewide (`NHSStreamId 00632240`), and its full 6-segment extent (lat 44.079–44.120) never
+comes within ~2.8 miles of N 20th Ave (lat ~44.068) — confirmed via a multi-km bbox spatial
+query returning zero features, then an exhaustive per-`NHSStreamId` check ruling out a
+partial-listing artifact. **Layer 1 has no coverage of this reach at all.** Layer 32
+(Designated Trout Stream) *does* have real, nearby geometry here (lon -85.113 to -85.147, lat
+44.056 to 44.077) — that part of the original ground-truth check was right; the two EGLE
+layers simply don't have matching coverage. This was caught while designing the ETL pipeline's
+spatial-intersection queries, not by re-running this section — a name-match check should
+never have been treated as a spatial one in the first place. `packages/schema`'s golden
+fixture and its test were corrected to match (`thermal_class: null` for parcel 008-00,
+`designated_trout_stream: true` unchanged).
 
 **What didn't work:** no county attribute exists on layer 1, so "which counties does this
 broader footprint touch" requires a spatial intersection against county boundaries, which
@@ -279,7 +291,7 @@ Five claims to check, from GIS alone:
 
 | Claim | Result |
 |---|---|
-| Middle Branch is a coldwater reach | ✅ **Reproduced** — MiEnviro layer 1, `TemperatureGradient = "Cold stream"` |
+| Middle Branch is a coldwater reach | ❌ **Not reproduced — corrected 2026-08-28.** Layer 1 has zero coverage near N 20th Ave (the original claim was a name match on a different, ~2.8mi-distant "Middle Branch River"). Layer 32's designated-trout-stream status *does* hold up on real nearby geometry — see the correction note above. |
 | Parcel identity / geometry / count | ✅ **Reproduced exactly**, once the 3rd parcel was found — 3.755 + 3.167 + 10.421 = 17.34 ac ≈ 17.37 ac |
 | ~93% Kalkaska on 013-20 / ~66% Au Gres on 009-00 | ⚠️ **The soil numbers are real** — ❌ **but the hand-traced AOIs carrying them don't spatially overlap the parcels the write-up attributes them to, per today's official parcel geometry.** See below — open, not resolved. |
 | ~14 ft relief over 1,800 ft | ❌ **Not reproduced — transect line was wrong, see previous section, unchanged by this update** |

@@ -25,12 +25,19 @@ describe("N 20th Ave golden record (05_SPIKE_FINDINGS.md)", () => {
     expect(total).toBeCloseTo(17.343, 2);
   });
 
-  it("classifies the Middle Branch River as a designated cold stream on the river-adjacent parcel (008-00) only", () => {
-    expect(PARCEL_008_00.groundwater.thermal_class.value).toBe("Cold stream");
-    expect(PARCEL_008_00.groundwater.designated_trout_stream.value).toBe(true);
-    expect(PARCEL_013_20.groundwater.thermal_class.value).toBeNull();
-    expect(PARCEL_009_00.groundwater.thermal_class.value).toBeNull();
-  });
+  it(
+    "designates 008-00 as trout-stream-adjacent via layer 32 (real nearby geometry), " +
+      "but does NOT claim a layer-1 thermal classification there — corrected 2026-08-28: " +
+      "the original 'Cold stream' value traced to a name match on a different, ~2.8mi-" +
+      "distant reach sharing the name 'Middle Branch River'; layer 1 has zero coverage " +
+      "near this parcel (confirmed via bbox query + exhaustive NHSStreamId check)",
+    () => {
+      expect(PARCEL_008_00.groundwater.thermal_class.value).toBeNull();
+      expect(PARCEL_008_00.groundwater.designated_trout_stream.value).toBe(true);
+      expect(PARCEL_013_20.groundwater.thermal_class.value).toBeNull();
+      expect(PARCEL_009_00.groundwater.thermal_class.value).toBeNull();
+    }
+  );
 
   it(
     "carries the spike's own re-derived soil percentages, NOT the disputed property " +

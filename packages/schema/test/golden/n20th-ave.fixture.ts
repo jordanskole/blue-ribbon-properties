@@ -1,6 +1,7 @@
 import type { CardDef } from "../../src/index.js";
 
 const SPIKE_DATE = "2026-08-27";
+const RECHECK_DATE = "2026-08-28";
 
 export const PARCEL_013_20: CardDef = {
   identity: {
@@ -213,12 +214,22 @@ export const PARCEL_008_00: CardDef = {
   },
   groundwater: {
     thermal_class: {
-      value: "Cold stream",
+      value: null,
       provenance: "verified",
       vintage: {
-        as_of: SPIKE_DATE,
+        as_of: RECHECK_DATE,
         source_type: "continuous",
-        note: 'MiEnviro layer 1, NHSStreamName "Middle Branch River"',
+        note:
+          "Corrected 2026-08-28: the original 'Cold stream' value came from a name " +
+          "match, not a spatial one. MiEnviro layer 1 has exactly one 'Middle Branch " +
+          "River' statewide (NHSStreamId 00632240, 6 segments, lat 44.079-44.120) and " +
+          "its full extent never comes within ~2.8 mi of this parcel (lat ~44.068) — " +
+          "confirmed via a multi-km bbox spatial query returning zero features, then " +
+          "an exhaustive NHSStreamId check ruling out a partial-listing artifact. " +
+          "designated_trout_stream below is unaffected: that value traces to real, " +
+          "nearby layer-32 geometry (lon -85.113 to -85.147, lat 44.056 to 44.077), " +
+          "independently confirmed. The two EGLE layers simply don't have matching " +
+          "coverage for this reach.",
       },
     },
     designated_trout_stream: {
