@@ -42,6 +42,22 @@ loop actually works, checked against a case we already know the right answer to.
    "expected values" get invented for this spec — the pipeline's output on N 20th Ave's
    three real parcels must equal `packages/schema/test/golden/n20th-ave.fixture.ts`'s
    non-null fields. That fixture is the one place in the repo we already know is right.
+5. **Parcels get a per-county adapter harness now, even though only one adapter (Osceola)
+   is registered in this pass.** Parcels are the one source that's genuinely per-county —
+   the spike found Osceola and Roscommon both have free public FeatureServers, but with
+   *different field names* for the same concepts (Osceola: `PIN`/`OWNER`/`PROPADD`;
+   Roscommon: truncated shapefile-style `c_Parcel_P`/`ParcelMast`), and Missaukee's is
+   token-gated, needing a fallback entirely. Building `fetch/parcels.ts` as one
+   Osceola-shaped function now would mean rewriting it the moment a second county shows
+   up. Instead: a `counties/` registry, mirroring `packages/schema`'s own
+   `LAYER_REGISTRY` pattern (a lookup keyed by name, same "typed registry +
+   get-with-a-clear-error" shape as `getLayer()`). Adding a county later is "write an
+   adapter, register it," not "modify the fetch code." **Only Osceola is registered
+   in this spec** — Roscommon (already spike-validated, different field names, a good
+   second case to prove the harness against) and Oscoda (a newly-relevant target parcel,
+   but with no parcel source found yet and no ground-truth facts to check output
+   against) are both sub-project 2's job, each earning its own ground-truth check the
+   way Osceola earned N 20th Ave's, before being trusted.
 
 ---
 
@@ -51,12 +67,28 @@ loop actually works, checked against a case we already know the right answer to.
 apps/etl/
   package.json, tsconfig.json, vitest.config.ts
   src/
+    counties/
+      types.ts        — CountyParcelAdapter interface:
+                          { county: string,
+                            fetchParcel(pin: string): Promise<RawParcelFeature>,
+                            normalize(raw: RawParcelFeature): NormalizedParcelRecord }
+                         NormalizedParcelRecord = { pin, county, township, acres,
+                          geometry } — the one shape every adapter must produce,
+                          regardless of what its source calls these fields.
+      osceola.ts        — the one adapter this pass registers: Osceola's FeatureServer
+                           URL + field names (PIN/OWNER/PROPADD/PROPCLASS/UNIT),
+                           implements fetchParcel + normalize
+      registry.ts         — COUNTY_REGISTRY: county name → adapter, and
+                              getCountyAdapter(county) — same lookup-with-a-clear-error
+                              shape as @brp/schema's getLayer()
     fetch/
       mienviro.ts    — MiEnviro layers 1 & 32 (bbox-filtered fetch; NOT the final
                          intersects test — that runs in DuckDB per decision 1)
       ssurgo.ts        — SDA fetch: clipped soil polygons for the parcel AOI, plus
                            component drainage-class/water-table data per mukey
-      parcels.ts         — county parcel FeatureServer fetch (Osceola, this pass)
+      parcels.ts         — thin: getCountyAdapter(county).fetchParcel(pin) →
+                             .normalize(raw) → a NormalizedParcelRecord. Never
+                             touches county-specific field names itself.
     duckdb/
       load.ts               — open an in-memory DuckDB, INSTALL/LOAD spatial,
                                 register fetched GeoJSON as tables
@@ -64,13 +96,19 @@ apps/etl/
     derive.ts                  — assemble one CardDef from compute.ts's results,
                                    attach provenance/vintage per LAYER_REGISTRY,
                                    call validateCard from @brp/schema
-    index.ts                    — runParcelEtl(pin: string): Promise<CardDef> —
-                                   orchestrates one parcel end to end
+    index.ts                    — runParcelEtl(pin: string, county: string):
+                                   Promise<CardDef> — orchestrates one parcel end to end
   test/
+    counties/
+      osceola.test.ts     — unit tests: does osceola.ts's normalize() correctly map
+                              raw PIN/OWNER/PROPADD/UNIT fields to a
+                              NormalizedParcelRecord (no network)
+      registry.test.ts      — unit tests: getCountyAdapter("Osceola") resolves;
+                                an unregistered county throws a clear error
     fetch/
       mienviro.test.ts   — unit tests against recorded fixture responses (no network)
       ssurgo.test.ts       — same
-      parcels.test.ts       — same
+      parcels.test.ts       — same (mocks the adapter, doesn't hit a real county)
     duckdb/
       compute.test.ts        — unit tests against small hand-built DuckDB tables
                                  (no network) — proves the SQL logic in isolation
@@ -99,10 +137,12 @@ package name rather than a relative path across package boundaries.
 ## Data flow, one parcel
 
 ```
-runParcelEtl("10-003-008-00")
+runParcelEtl("10-003-008-00", "Osceola")
   │
-  ├─ fetch/parcels.ts   → parcel polygon (GeoJSON, WGS84) from Osceola's FeatureServer
-  │                        (query by Twp/Sec/ID, same pattern the spike proved)
+  ├─ fetch/parcels.ts   → getCountyAdapter("Osceola") → osceola.ts's fetchParcel +
+  │                        normalize → a NormalizedParcelRecord with WGS84 geometry
+  │                        (query by Twp/Sec/ID, same pattern the spike proved;
+  │                        adapter-internal, parcels.ts itself never sees PIN/OWNER/etc)
   │
   ├─ fetch/mienviro.ts  → layer-1 features + layer-32 features within the parcel's
   │                        bbox (small buffer), f=geojson. NOT filtered to "intersects
@@ -181,8 +221,12 @@ not a new source.
 - Relief (`relief_envelope_to_water_ft`), prominence (`prominence_ft`), wetland
   (`wetland_pct`, `wetland_between_envelope_and_water`), adjacency (`adjacent`) — same,
   each needs a method not yet proven correct.
-- Any county besides Osceola, any parcel besides N 20th Ave's three — that's sub-project 2
-  (ETL generalized).
+- Any county adapter besides Osceola, any parcel besides N 20th Ave's three — that's
+  sub-project 2 (ETL generalized). **Two specific counties are already known to be next:**
+  Roscommon (spike-validated free FeatureServer, different field names — a good second
+  adapter to prove the harness against) and Oscoda (a newly-relevant target parcel, but
+  needs its own source discovery and its own ground-truth check first — nothing to build
+  an adapter against yet, and no known-right-answer facts to test output against).
 - Writing to Parquet / any published output format — this pass ends at an in-memory
   `CardDef`, validated and compared to the fixture. Publishing is also sub-project 2's
   concern, once there's a real multi-parcel batch worth publishing.
