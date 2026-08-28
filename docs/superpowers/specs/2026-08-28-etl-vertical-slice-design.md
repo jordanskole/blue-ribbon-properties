@@ -20,6 +20,27 @@ loop actually works, checked against a case we already know the right answer to.
    every `ST_Intersects`/`ST_Area`/area-weighting computation is SQL against DuckDB's
    spatial extension. One geometry engine for the whole system — the same engine the
    `query_data` MCP tool will expose later, not a second stack that has to agree with it.
+
+   **⚠️ Verified before writing the plan, and it changes what "compute area in DuckDB"
+   actually means:** a throwaway probe (`@duckdb/node-api` 1.5.5, `spatial` extension)
+   against N 20th Ave's real 013-20 polygon found that DuckDB spatial's own geodesic area
+   functions — `ST_Area_Spheroid`, and `ST_Area` after `ST_Transform` to a projected CRS
+   (EPSG:3857 or UTM 16N) — both return area **~8.4× too small** at this latitude (44°N)
+   compared to the spike's already-proven 3.755 acres, while a *correct* result at the
+   equator (same functions, tested independently) confirmed the functions aren't simply
+   broken outright. Likely cause: an axis-order mismatch (EPSG:4326's formal axis order is
+   lat/lon; GeoJSON and this pipeline's data are lon/lat), not chased down further since a
+   working, verified alternative was found. **The verified, correct formula — confirmed to
+   match the spike's proven acreage to within 0.02%** — is the same equirectangular
+   approximation the spike's own Python code already used, translated to SQL:
+   ```sql
+   ST_Area(geom) * POWER(111320.0, 2) * COS(RADIANS(ST_Y(ST_Centroid(geom)))) / 4046.8564224
+   ```
+   (raw planar shoelace area in degree², × meters-per-degree² at the equator, × a per-row
+   `cos(centroid latitude)` longitude-compression correction, ÷ m² per acre.) **Every area
+   computation in this spec uses this formula, not `ST_Area_Spheroid` or `ST_Transform`.**
+   This approximation is only valid at parcel scale (a few acres, sub-degree extent) — fine
+   here, would need revisiting for anything spanning a wide latitude range.
 2. **SDA's server-side clip is still used for *fetching*, not for *computing*.** SDA offers
    a clip (`mupolygongeo.STIntersection(...)`, the exact T-SQL the spike proved) specifically
    so ETL never has to download an entire county's unclipped soil polygons to look at one
@@ -90,9 +111,15 @@ apps/etl/
                              .normalize(raw) → a NormalizedParcelRecord. Never
                              touches county-specific field names itself.
     duckdb/
-      load.ts               — open an in-memory DuckDB, INSTALL/LOAD spatial,
-                                register fetched GeoJSON as tables
-      compute.ts              — the spatial SQL queries (see below)
+      load.ts               — `@duckdb/node-api` (verified working; the older `duckdb`
+                                npm package's native binding failed to load on this
+                                environment's Node version). Open an in-memory
+                                `DuckDBInstance`, `INSTALL spatial; LOAD spatial;`,
+                                register fetched GeoJSON as tables via
+                                `ST_GeomFromGeoJSON($1::VARCHAR)` on a parameterized `run()`
+      compute.ts              — the spatial SQL queries (see below) — all area math uses
+                                 the verified formula from decision 1, never
+                                 `ST_Area_Spheroid`/`ST_Transform`
     derive.ts                  — assemble one CardDef from compute.ts's results,
                                    attach provenance/vintage per LAYER_REGISTRY,
                                    call validateCard from @brp/schema
@@ -158,7 +185,8 @@ runParcelEtl("10-003-008-00", "Osceola")
   │                        from (a), majcompflag='Yes'
   │
   ├─ duckdb/load.ts     → INSTALL spatial; LOAD spatial; register all of the above as
-  │                        DuckDB tables (ST_GeomFromGeoJSON / ST_GeomFromText)
+  │                        DuckDB tables via ST_GeomFromGeoJSON($1::VARCHAR) on a
+  │                        parameterized con.run() (@duckdb/node-api)
   │
   ├─ duckdb/compute.ts  → three queries:
   │     thermal_class          = SELECT TemperatureGradient FROM mienviro_1
@@ -166,12 +194,17 @@ runParcelEtl("10-003-008-00", "Osceola")
   │     designated_trout        = EXISTS(SELECT 1 FROM mienviro_32
   │                               WHERE ST_Intersects(geom, parcel_geom)
   │                               AND Designated = 1)
-  │     dry_wet_by_mukey         = SELECT mukey, ST_Area(geom_geography) AS acres
-  │                               FROM ssurgo_polygons GROUP BY mukey
-  │                               (joined against the component table's drainagecl
-  │                               to classify each mukey dry/wet per the A2 rule:
-  │                               "well-drained or somewhat-excessively-drained AND
-  │                               no water table in profile" = dry, else wet)
+  │     dry_wet_by_mukey         = SELECT mukey,
+  │                               ST_Area(geom) * POWER(111320.0, 2) *
+  │                               COS(RADIANS(ST_Y(ST_Centroid(geom)))) / 4046.8564224
+  │                               AS acres
+  │                               FROM ssurgo_polygons GROUP BY mukey, geom
+  │                               (the verified formula from decision 1 — NOT
+  │                               ST_Area_Spheroid; joined against the component
+  │                               table's drainagecl to classify each mukey dry/wet
+  │                               per the A2 rule: "well-drained or
+  │                               somewhat-excessively-drained AND no water table in
+  │                               profile" = dry, else wet)
   │
   └─ derive.ts          → sum dry_wet_by_mukey by classification → dry_acres/wet_acres;
                            dominant_dry_soil = the dry-classified mukey with the largest
