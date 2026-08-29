@@ -1,7 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "."
+    // Widened from "." to the monorepo root: the integration test imports
+    // packages/schema's golden fixture via a raw relative path (deliberately,
+    // not through the @brp/schema package export -- see
+    // test/integration/n20th-ave.test.ts), which pulls packages/schema/src/**
+    // into this program via a path that doesn't go through node_modules and
+    // so isn't exempt from rootDir enforcement the way the @brp/schema import
+    // elsewhere in this package is.
+    "rootDir": "../.."
   },
   "include": ["src", "test"]
 }
