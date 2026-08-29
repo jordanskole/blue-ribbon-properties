@@ -16,9 +16,16 @@ describe("getCountyAdapter", () => {
     expect(typeof adapter.normalize).toBe("function");
   });
 
+  it("resolves the Roscommon adapter", () => {
+    const adapter = getCountyAdapter("Roscommon");
+    expect(adapter.county).toBe("Roscommon");
+    expect(typeof adapter.fetchParcel).toBe("function");
+    expect(typeof adapter.normalize).toBe("function");
+  });
+
   it("throws a clear error for an unregistered county", () => {
-    expect(() => getCountyAdapter("Roscommon")).toThrow(
-      'No CountyParcelAdapter registered for county "Roscommon"'
+    expect(() => getCountyAdapter("Wexford")).toThrow(
+      'No CountyParcelAdapter registered for county "Wexford"'
     );
   });
 });
