@@ -77,6 +77,34 @@ describe("duckdb compute", () => {
     expect(result).toBe("Cold stream");
   });
 
+  it("computeThermalClass returns null when a reach exists in the table but is geometrically disjoint from the parcel (proves ST_Intersects actually filters, not just reflects an empty table)", async () => {
+    await loadMiEnviroFeatures(
+      session,
+      "mienviro_1",
+      [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [-85.5, 44.5],
+                [-85.49, 44.5],
+                [-85.49, 44.51],
+                [-85.5, 44.51],
+                [-85.5, 44.5],
+              ],
+            ],
+          },
+          properties: { TemperatureGradient: "Cold stream" },
+        },
+      ],
+      ["TemperatureGradient"]
+    );
+    const result = await computeThermalClass(session);
+    expect(result).toBeNull();
+  });
+
   it("computeDesignatedTroutStream returns false with no intersecting Designated=1 feature", async () => {
     await loadMiEnviroFeatures(session, "mienviro_32", [], ["Designated"]);
     const result = await computeDesignatedTroutStream(session);
@@ -109,6 +137,34 @@ describe("duckdb compute", () => {
     );
     const result = await computeDesignatedTroutStream(session);
     expect(result).toBe(true);
+  });
+
+  it("computeDesignatedTroutStream returns false when a Designated=1 feature exists in the table but is geometrically disjoint from the parcel", async () => {
+    await loadMiEnviroFeatures(
+      session,
+      "mienviro_32",
+      [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [-85.5, 44.5],
+                [-85.49, 44.5],
+                [-85.49, 44.51],
+                [-85.5, 44.51],
+                [-85.5, 44.5],
+              ],
+            ],
+          },
+          properties: { Designated: "1" },
+        },
+      ],
+      ["Designated"]
+    );
+    const result = await computeDesignatedTroutStream(session);
+    expect(result).toBe(false);
   });
 
   it("computeSoilPolygonAreas returns the verified acreage for the full parcel polygon itself", async () => {
