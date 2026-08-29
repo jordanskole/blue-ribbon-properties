@@ -20,11 +20,22 @@ describe("validateIdentity", () => {
     expect(validateIdentity(makeIdentity())).toEqual([]);
   });
 
-  it("rejects a parcel_id that isn't NN-NNN-NNN-NN", () => {
+  it("rejects a parcel_id that isn't dash-separated digit groups", () => {
     const errors = validateIdentity(makeIdentity({ parcel_id: "10 003 013 20" }));
     expect(errors).toContain(
-      'parcel_id "10 003 013 20" does not match expected PIN format NN-NNN-NNN-NN'
+      'parcel_id "10 003 013 20" does not match expected PIN format (dash-separated digit groups)'
     );
+  });
+
+  it("accepts Iosco's 5-segment PIN shape", () => {
+    const errors = validateIdentity(
+      makeIdentity({
+        parcel_id: "062-026-300-020-00",
+        county: "Iosco",
+        township: "Oscoda",
+      })
+    );
+    expect(errors).toEqual([]);
   });
 
   it("rejects an empty county", () => {

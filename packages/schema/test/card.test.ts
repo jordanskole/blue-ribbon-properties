@@ -97,7 +97,7 @@ describe("validateCard", () => {
       },
     });
     expect(validateCard(card)).toContain(
-      'parcel_id "not-a-pin" does not match expected PIN format NN-NNN-NNN-NN'
+      'parcel_id "not-a-pin" does not match expected PIN format (dash-separated digit groups)'
     );
   });
 
