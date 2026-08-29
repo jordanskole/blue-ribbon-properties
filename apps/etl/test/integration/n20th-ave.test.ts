@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { validateCard } from "@brp/schema";
 import { runParcelEtl } from "../../src/index.js";
 import {
   PARCEL_013_20,
@@ -16,6 +17,12 @@ describe("N 20th Ave, real network, real DuckDB (npm run test:integration)", () 
         runParcelEtl("10-003-008-00", "Osceola"),
       ]);
       const [card013, card009, card008] = results;
+
+      // Each real card validates cleanly -- confirms identity.acres (now
+      // DuckDB-computed, see Finding 2) is consistent with dry_acres + wet_acres.
+      expect(validateCard(card013)).toEqual([]);
+      expect(validateCard(card009)).toEqual([]);
+      expect(validateCard(card008)).toEqual([]);
 
       // Identity
       expect(card013.identity.parcel_id).toBe(PARCEL_013_20.identity.parcel_id);

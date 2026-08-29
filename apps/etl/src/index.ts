@@ -21,6 +21,7 @@ import {
   computeThermalClass,
   computeDesignatedTroutStream,
   computeSoilPolygonAreas,
+  computeParcelAcres,
 } from "./duckdb/compute.js";
 import { summarizeSoil, deriveCard } from "./derive.js";
 
@@ -51,10 +52,11 @@ export async function runParcelEtl(pin: string, county: string): Promise<CardDef
   await loadMiEnviroFeatures(session, "mienviro_32", troutStreams, ["Designated"]);
   await loadSoilPolygons(session, soilPolygons);
 
-  const [thermalClass, designatedTroutStream, soilAreas] = await Promise.all([
+  const [thermalClass, designatedTroutStream, soilAreas, verifiedAcres] = await Promise.all([
     computeThermalClass(session),
     computeDesignatedTroutStream(session),
     computeSoilPolygonAreas(session),
+    computeParcelAcres(session),
   ]);
 
   const { dominantDry } = summarizeSoil(soilAreas, components);
@@ -63,7 +65,10 @@ export async function runParcelEtl(pin: string, county: string): Promise<CardDef
     : null;
 
   return deriveCard({
-    parcel,
+    // identity.acres must come from the same verified DuckDB area formula as
+    // every other acreage on the card, not from the county FeatureServer's
+    // own Shape__Area attribute (parcel.acres) -- see Finding 2.
+    parcel: { ...parcel, acres: verifiedAcres },
     thermalClass,
     designatedTroutStream,
     soilAreas,

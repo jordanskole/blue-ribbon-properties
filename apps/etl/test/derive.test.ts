@@ -75,6 +75,16 @@ describe("summarizeSoil", () => {
     expect(result.dryAcres).toBe(0);
     expect(result.wetAcres).toBeCloseTo(2.117, 3);
   });
+
+  it("picks the highest-comppct_r component when a mukey has more than one major component", () => {
+    const componentA: ComponentInfo = { ...KALKASKA, cokey: "AAA", comppct_r: 40 };
+    const componentB: ComponentInfo = { ...KALKASKA, cokey: "BBB", comppct_r: 60 };
+    const result = summarizeSoil(
+      [{ mukey: "190064", acres: 2.0 }],
+      [componentA, componentB] // both claim mukey 190064; B has higher comppct_r
+    );
+    expect(result.dominantDry?.cokey).toBe("BBB");
+  });
 });
 
 describe("deriveCard", () => {
@@ -117,7 +127,10 @@ describe("deriveCard", () => {
 
   it("carries a null thermal_class through when MiEnviro found no intersecting reach", () => {
     const card = deriveCard({
-      parcel: PARCEL,
+      // acres: 0.005 keeps this within validateCard's tolerance of the empty
+      // soilAreas below (dry+wet=0) while staying positive -- this test only
+      // exercises thermal_class, not the acres cross-check.
+      parcel: { ...PARCEL, acres: 0.005 },
       thermalClass: null,
       designatedTroutStream: false,
       soilAreas: [],
@@ -140,5 +153,35 @@ describe("deriveCard", () => {
         fetchedAt: "2026-08-28",
       })
     ).toThrow('Unexpected TemperatureGradient value from MiEnviro: "Lukewarm stream"');
+  });
+
+  it("treats an empty-string thermal class the same as null, rather than throwing", () => {
+    const card = deriveCard({
+      // acres: 0.005 keeps this within validateCard's tolerance of the empty
+      // soilAreas below (dry+wet=0) while staying positive -- this test only
+      // exercises thermal_class, not the acres cross-check.
+      parcel: { ...PARCEL, acres: 0.005 },
+      thermalClass: "",
+      designatedTroutStream: false,
+      soilAreas: [],
+      components: [],
+      dominantDrySoilRating: null,
+      fetchedAt: "2026-08-28",
+    });
+    expect(card.groundwater.thermal_class.value).toBeNull();
+  });
+
+  it("throws if the assembled card would fail validateCard's invariants", () => {
+    expect(() =>
+      deriveCard({
+        parcel: { ...PARCEL, acres: 100 }, // real acres is 3.755; this mismatch should trip validateCard
+        thermalClass: null,
+        designatedTroutStream: false,
+        soilAreas: [{ mukey: "190064", acres: 1.638 }],
+        components: [KALKASKA],
+        dominantDrySoilRating: "Not limited",
+        fetchedAt: "2026-08-28",
+      })
+    ).toThrow(/deriveCard produced an invalid CardDef/);
   });
 });

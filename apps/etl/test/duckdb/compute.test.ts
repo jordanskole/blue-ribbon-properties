@@ -10,6 +10,7 @@ import {
   computeThermalClass,
   computeDesignatedTroutStream,
   computeSoilPolygonAreas,
+  computeParcelAcres,
 } from "../../src/duckdb/compute.js";
 import { ringToWkt } from "../../src/fetch/ssurgo.js";
 
@@ -165,6 +166,11 @@ describe("duckdb compute", () => {
     );
     const result = await computeDesignatedTroutStream(session);
     expect(result).toBe(false);
+  });
+
+  it("computeParcelAcres returns the verified acreage for the parcel itself", async () => {
+    const acres = await computeParcelAcres(session);
+    expect(acres).toBeCloseTo(3.755, 2);
   });
 
   it("computeSoilPolygonAreas returns the verified acreage for the full parcel polygon itself", async () => {

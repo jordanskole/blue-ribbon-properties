@@ -36,6 +36,19 @@ export async function computeDesignatedTroutStream(
   return Number(rows[0].n) > 0;
 }
 
+/** Computes the parcel's own acreage using the same verified area formula as
+ * every other area on the card (see AREA_ACRES_SQL above) -- rather than
+ * trusting a county FeatureServer's precomputed area attribute, whose units
+ * depend on the source layer's CRS and vary per county. */
+export async function computeParcelAcres(session: DuckDbSession): Promise<number> {
+  const reader = await session.connection.runAndReadAll(`
+    SELECT ${AREA_ACRES_SQL} AS acres
+    FROM parcel
+  `);
+  const rows = reader.getRowObjectsJS();
+  return Number(rows[0].acres);
+}
+
 export interface SoilPolygonArea {
   mukey: string;
   acres: number;
