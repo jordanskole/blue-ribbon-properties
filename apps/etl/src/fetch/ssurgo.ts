@@ -57,9 +57,10 @@ export async function fetchComponents(mukeys: string[]): Promise<ComponentInfo[]
   if (mukeys.length === 0) return [];
   const mukeyList = mukeys.map((m) => `'${m}'`).join(",");
   const query = `
-SELECT mukey, compname, comppct_r, drainagecl, wtdepannmin, cokey
-FROM component
-WHERE mukey IN (${mukeyList}) AND majcompflag = 'Yes'
+SELECT c.mukey, c.compname, c.comppct_r, c.drainagecl, m.wtdepannmin, c.cokey
+FROM component c
+INNER JOIN muaggatt m ON m.mukey = c.mukey
+WHERE c.mukey IN (${mukeyList}) AND c.majcompflag = 'Yes'
 `;
   const rows = await sdaQuery(query);
   return rows.map(([mukey, compname, comppct_r, drainagecl, wtdepannmin, cokey]) => ({
