@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { normalize } from "../../src/counties/roscommon.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { normalize, fetchParcelsIntersecting } from "../../src/counties/roscommon.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
 
 function makeRawFeature(
@@ -50,5 +50,55 @@ describe("roscommon normalize", () => {
     expect(() => normalize(raw)).toThrow(
       'expected Polygon geometry, got "MultiPolygon"'
     );
+  });
+});
+
+describe("roscommon fetchParcelsIntersecting", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("requests a polygon-intersects query, enriches each candidate with township, and returns raw features", async () => {
+    const queryResponse = {
+      features: [
+        {
+          type: "Feature",
+          properties: { PIN: "011-430-045-0000", Shape__Area: 1046.76 },
+          geometry: {
+            type: "Polygon",
+            coordinates: [[[-84.7755, 44.328], [-84.775, 44.328], [-84.775, 44.3282], [-84.7755, 44.328]]],
+          },
+        },
+      ],
+    };
+    const mcdResponse = { features: [{ attributes: { Name: "Roscommon" } }] };
+    let callCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        callCount += 1;
+        if (url.includes("MinorCivilDivision")) {
+          return { ok: true, json: async () => mcdResponse };
+        }
+        return { ok: true, json: async () => queryResponse };
+      })
+    );
+    const polygon = {
+      type: "Polygon" as const,
+      coordinates: [[[-84.78, 44.32], [-84.77, 44.32], [-84.77, 44.33], [-84.78, 44.33], [-84.78, 44.32]]],
+    };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toHaveLength(1);
+    expect(features[0].properties.PIN).toBe("011-430-045-0000");
+    expect(features[0].properties.Shape__Area).toBe(1046.76);
+    expect(features[0].properties.township).toBe("Roscommon");
+    expect(callCount).toBe(2); // parcel query + one MCD lookup for the one candidate
+  });
+
+  it("returns an empty array when nothing intersects, without erroring", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ features: [] }) })));
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toEqual([]);
   });
 });

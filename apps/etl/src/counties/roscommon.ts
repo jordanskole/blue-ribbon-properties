@@ -2,6 +2,7 @@ import type {
   CountyParcelAdapter,
   RawParcelFeature,
   NormalizedParcelRecord,
+  GeoJSONPolygon,
 } from "./types.js";
 import { polygonCentroid, fetchTownship } from "./shared/township-lookup.js";
 
@@ -74,6 +75,42 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
   };
 }
 
+export async function fetchParcelsIntersecting(
+  polygon: GeoJSONPolygon
+): Promise<RawParcelFeature[]> {
+  const geometryParam = JSON.stringify({
+    rings: polygon.coordinates,
+    spatialReference: { wkid: 4326 },
+  });
+  const url =
+    `${PARCEL_FEATURESERVER_QUERY_URL}?f=geojson&geometry=${encodeURIComponent(geometryParam)}` +
+    `&geometryType=esriGeometryPolygon&spatialRel=esriSpatialRelIntersects&inSR=4326` +
+    `&outFields=PIN,Shape__Area`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `Roscommon FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+    );
+  }
+  const body = (await res.json()) as GeoJsonFeatureCollection;
+  const results: RawParcelFeature[] = [];
+  for (const feature of body.features) {
+    if (feature.geometry.type !== "Polygon") continue;
+    const ring = (feature.geometry.coordinates as number[][][])[0] as [number, number][];
+    const [centroidLng, centroidLat] = polygonCentroid(ring);
+    const township = await fetchTownship(centroidLng, centroidLat);
+    results.push({
+      properties: {
+        PIN: feature.properties.PIN,
+        Shape__Area: feature.properties.Shape__Area,
+        township,
+      },
+      geometry: feature.geometry as RawParcelFeature["geometry"],
+    });
+  }
+  return results;
+}
+
 export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {
   const props = raw.properties;
   const pin = String(props.PIN);
@@ -108,4 +145,5 @@ export const roscommonAdapter: CountyParcelAdapter = {
   county: "Roscommon",
   fetchParcel,
   normalize,
+  fetchParcelsIntersecting,
 };
