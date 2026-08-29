@@ -2,6 +2,7 @@ import type {
   CountyParcelAdapter,
   RawParcelFeature,
   NormalizedParcelRecord,
+  GeoJSONPolygon,
 } from "./types.js";
 
 const FEATURE_SERVER_URL =
@@ -35,6 +36,27 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
     throw new Error(`Osceola adapter: no parcel found for PIN "${pin}"`);
   }
   return body.features[0];
+}
+
+export async function fetchParcelsIntersecting(
+  polygon: GeoJSONPolygon
+): Promise<RawParcelFeature[]> {
+  const geometryParam = JSON.stringify({
+    rings: polygon.coordinates,
+    spatialReference: { wkid: 4326 },
+  });
+  const url =
+    `${FEATURE_SERVER_URL}?geometry=${encodeURIComponent(geometryParam)}` +
+    `&geometryType=esriGeometryPolygon&spatialRel=esriSpatialRelIntersects&inSR=4326` +
+    `&outFields=PIN,OWNER,PROPCLASS,UNIT,Shape__Area&f=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `Osceola FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+    );
+  }
+  const body = (await res.json()) as { features: RawParcelFeature[] };
+  return body.features;
 }
 
 export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {
@@ -79,4 +101,5 @@ export const osceolaAdapter: CountyParcelAdapter = {
   county: "Osceola",
   fetchParcel,
   normalize,
+  fetchParcelsIntersecting,
 };

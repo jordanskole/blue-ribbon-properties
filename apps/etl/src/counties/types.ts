@@ -17,8 +17,14 @@ export interface NormalizedParcelRecord {
   };
 }
 
+export interface GeoJSONPolygon {
+  type: "Polygon";
+  coordinates: number[][][];
+}
+
 export interface CountyParcelAdapter {
   county: string;
   fetchParcel(pin: string): Promise<RawParcelFeature>;
   normalize(raw: RawParcelFeature): NormalizedParcelRecord;
+  fetchParcelsIntersecting?(polygon: GeoJSONPolygon): Promise<RawParcelFeature[]>;
 }

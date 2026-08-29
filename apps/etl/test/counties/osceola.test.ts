@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { normalize } from "../../src/counties/osceola.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { normalize, fetchParcelsIntersecting } from "../../src/counties/osceola.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
 
 function makeRawFeature(
@@ -49,6 +49,49 @@ describe("osceola normalize", () => {
     raw.geometry.type = "MultiPolygon";
     expect(() => normalize(raw)).toThrow(
       'expected Polygon geometry, got "MultiPolygon"'
+    );
+  });
+});
+
+describe("osceola fetchParcelsIntersecting", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("requests a polygon-intersects query and returns the raw features", async () => {
+    const mockResponse = {
+      features: [
+        {
+          type: "Feature",
+          properties: { PIN: "10 003 023 00", OWNER: "X", PROPCLASS: "Y", UNIT: "MIDDLE BRANCH TOWNSHIP", Shape__Area: 1000 },
+          geometry: { type: "Polygon", coordinates: [[[-85.13, 44.068], [-85.12, 44.068], [-85.12, 44.07], [-85.13, 44.068]]] },
+        },
+      ],
+    };
+    let requestedUrl = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requestedUrl = url;
+        return { ok: true, json: async () => mockResponse };
+      })
+    );
+    const polygon = {
+      type: "Polygon" as const,
+      coordinates: [[[-85.135, 44.066], [-85.125, 44.066], [-85.125, 44.07], [-85.135, 44.07], [-85.135, 44.066]]],
+    };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toHaveLength(1);
+    expect(features[0].properties.PIN).toBe("10 003 023 00");
+    expect(requestedUrl).toContain("geometryType=esriGeometryPolygon");
+    expect(requestedUrl).toContain("spatialRel=esriSpatialRelIntersects");
+  });
+
+  it("throws a clear error on an HTTP failure", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500, statusText: "Internal Server Error" })));
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    await expect(fetchParcelsIntersecting(polygon)).rejects.toThrow(
+      "Osceola FeatureServer intersects request failed: 500 Internal Server Error"
     );
   });
 });
