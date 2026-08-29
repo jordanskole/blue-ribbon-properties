@@ -1,4 +1,5 @@
 import type { CardDef } from "@brp/schema";
+import type { NormalizedParcelRecord } from "./counties/types.js";
 import { fetchParcel } from "./fetch/parcels.js";
 import {
   fetchColdStreams,
@@ -30,10 +31,8 @@ import { summarizeSoil, deriveCard } from "./derive.js";
 // DuckDB ST_Intersects against the parcel's exact geometry, not this bbox.
 const MIENVIRO_BBOX_BUFFER_DEG = 0.01;
 
-export async function runParcelEtl(pin: string, county: string): Promise<CardDef> {
+export async function deriveCardForParcel(parcel: NormalizedParcelRecord): Promise<CardDef> {
   const fetchedAt = new Date().toISOString().slice(0, 10);
-
-  const parcel = await fetchParcel(pin, county);
   const parcelWkt = ringToWkt(parcel.geometry.coordinates[0]);
   const bbox = bboxFromGeometry(parcel.geometry, MIENVIRO_BBOX_BUFFER_DEG);
 
@@ -76,4 +75,9 @@ export async function runParcelEtl(pin: string, county: string): Promise<CardDef
     dominantDrySoilRating,
     fetchedAt,
   });
+}
+
+export async function runParcelEtl(pin: string, county: string): Promise<CardDef> {
+  const parcel = await fetchParcel(pin, county);
+  return deriveCardForParcel(parcel);
 }
