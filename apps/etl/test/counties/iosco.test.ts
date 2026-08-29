@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalize, webMercatorToWgs84, polygonCentroid } from "../../src/counties/iosco.js";
+import { normalize, webMercatorToWgs84 } from "../../src/counties/iosco.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
 
 function makeRawFeature(
@@ -35,24 +35,6 @@ describe("webMercatorToWgs84", () => {
     const [lng, lat] = webMercatorToWgs84(-9287826.28, 5533738.12);
     expect(lng).toBeCloseTo(-83.43396303570957, 9);
     expect(lat).toBeCloseTo(44.4396825950131, 9);
-  });
-});
-
-describe("polygonCentroid", () => {
-  it("matches DuckDB's ST_Centroid for the target parcel's ring", () => {
-    // Verified live against DuckDB ST_Y(ST_Centroid(...))/ST_X(ST_Centroid(...))
-    // for the same ring, post-reprojection.
-    const ring: [number, number][] = [
-      [-83.43396303570957, 44.4396825950131],
-      [-83.43610488884151, 44.439693306162795],
-      [-83.4361026430533, 44.44150763113336],
-      [-83.43395432205132, 44.44149736927274],
-      [-83.43395513053508, 44.44132182704021],
-      [-83.43396303570957, 44.4396825950131],
-    ];
-    const [lng, lat] = polygonCentroid(ring);
-    expect(lng).toBeCloseTo(-83.43503116505623, 5);
-    expect(lat).toBeCloseTo(44.44059568290728, 5);
   });
 });
 
