@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { normalize, webMercatorToWgs84 } from "../../src/counties/iosco.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import {
+  normalize,
+  webMercatorToWgs84,
+  fetchParcelsIntersecting,
+} from "../../src/counties/iosco.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
 
 function makeRawFeature(
@@ -60,5 +64,48 @@ describe("iosco normalize", () => {
     expect(() => normalize(raw)).toThrow(
       'expected Polygon geometry, got "MultiPolygon"'
     );
+  });
+});
+
+describe("iosco fetchParcelsIntersecting", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("requests a polygon-intersects query, reprojects, and enriches each candidate with township", async () => {
+    const queryResponse = {
+      features: [
+        {
+          attributes: { TaxID: "062-026-300-020-00", Shape_Area: 370596.15 },
+          geometry: { rings: [[[-9287826.28, 5533738.12], [-9288064.71, 5533739.79], [-9287825.31, 5534021.07], [-9287826.28, 5533738.12]]] },
+        },
+      ],
+    };
+    const mcdResponse = { features: [{ attributes: { Name: "Oscoda" } }] };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("MinorCivilDivision")) {
+          return { ok: true, json: async () => mcdResponse };
+        }
+        return { ok: true, json: async () => queryResponse };
+      })
+    );
+    const polygon = {
+      type: "Polygon" as const,
+      coordinates: [[[-83.44, 44.43], [-83.43, 44.43], [-83.43, 44.44], [-83.44, 44.44], [-83.44, 44.43]]],
+    };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toHaveLength(1);
+    expect(features[0].properties.TaxID).toBe("062-026-300-020-00");
+    expect(features[0].properties.township).toBe("Oscoda");
+    expect(features[0].geometry.type).toBe("Polygon");
+  });
+
+  it("returns an empty array when nothing intersects, without erroring", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ features: [] }) })));
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toEqual([]);
   });
 });

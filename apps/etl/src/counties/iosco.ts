@@ -2,6 +2,7 @@ import type {
   CountyParcelAdapter,
   RawParcelFeature,
   NormalizedParcelRecord,
+  GeoJSONPolygon,
 } from "./types.js";
 import { polygonCentroid, fetchTownship } from "./shared/township-lookup.js";
 
@@ -79,6 +80,44 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
   };
 }
 
+export async function fetchParcelsIntersecting(
+  polygon: GeoJSONPolygon
+): Promise<RawParcelFeature[]> {
+  const geometryParam = JSON.stringify({
+    rings: polygon.coordinates,
+    spatialReference: { wkid: 4326 },
+  });
+  const innerQuery =
+    `f=json&geometry=${encodeURIComponent(geometryParam)}&geometryType=esriGeometryPolygon` +
+    `&spatialRel=esriSpatialRelIntersects&inSR=4326&outFields=TaxID,Shape_Area`;
+  const url = `${PROXY_BASE}${PARCEL_FEATURESERVER_QUERY_URL}?${innerQuery}`;
+  const res = await fetch(url, { headers: { Referer: FETCHGIS_REFERER } });
+  if (!res.ok) {
+    throw new Error(
+      `Iosco FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+    );
+  }
+  const body = (await res.json()) as EsriQueryResponse;
+  const results: RawParcelFeature[] = [];
+  for (const feature of body.features) {
+    const ringWgs84 = feature.geometry.rings[0].map(([x, y]) => webMercatorToWgs84(x, y)) as [
+      number,
+      number,
+    ][];
+    const [centroidLng, centroidLat] = polygonCentroid(ringWgs84);
+    const township = await fetchTownship(centroidLng, centroidLat);
+    results.push({
+      properties: {
+        TaxID: feature.attributes.TaxID,
+        Shape_Area: feature.attributes.Shape_Area,
+        township,
+      },
+      geometry: { type: "Polygon", coordinates: [ringWgs84] },
+    });
+  }
+  return results;
+}
+
 export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {
   const props = raw.properties;
   const pin = String(props.TaxID);
@@ -109,4 +148,5 @@ export const ioscoAdapter: CountyParcelAdapter = {
   county: "Iosco",
   fetchParcel,
   normalize,
+  fetchParcelsIntersecting,
 };

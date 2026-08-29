@@ -26,5 +26,5 @@ export interface CountyParcelAdapter {
   county: string;
   fetchParcel(pin: string): Promise<RawParcelFeature>;
   normalize(raw: RawParcelFeature): NormalizedParcelRecord;
-  fetchParcelsIntersecting?(polygon: GeoJSONPolygon): Promise<RawParcelFeature[]>;
+  fetchParcelsIntersecting(polygon: GeoJSONPolygon): Promise<RawParcelFeature[]>;
 }
