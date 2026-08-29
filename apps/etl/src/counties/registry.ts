@@ -1,8 +1,10 @@
 import type { CountyParcelAdapter } from "./types.js";
 import { osceolaAdapter } from "./osceola.js";
+import { ioscoAdapter } from "./iosco.js";
 
 export const COUNTY_REGISTRY: Record<string, CountyParcelAdapter> = {
   Osceola: osceolaAdapter,
+  Iosco: ioscoAdapter,
 };
 
 export function getCountyAdapter(county: string): CountyParcelAdapter {

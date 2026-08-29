@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { LAYER_REGISTRY, getLayer } from "../src/layers.js";
 
 describe("LAYER_REGISTRY", () => {
-  it("has exactly 7 v1 entries", () => {
-    expect(LAYER_REGISTRY).toHaveLength(7);
+  it("has exactly 8 entries", () => {
+    expect(LAYER_REGISTRY).toHaveLength(8);
   });
 
   it("has unique ids", () => {
@@ -17,6 +17,7 @@ describe("LAYER_REGISTRY", () => {
       [
         "egle_mienviro_1",
         "egle_mienviro_32",
+        "mgf_minor_civil_division",
         "nwi_wetlands",
         "parcel_source",
         "ssurgo_sda",

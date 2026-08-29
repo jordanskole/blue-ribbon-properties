@@ -9,6 +9,13 @@ describe("getCountyAdapter", () => {
     expect(typeof adapter.normalize).toBe("function");
   });
 
+  it("resolves the Iosco adapter", () => {
+    const adapter = getCountyAdapter("Iosco");
+    expect(adapter.county).toBe("Iosco");
+    expect(typeof adapter.fetchParcel).toBe("function");
+    expect(typeof adapter.normalize).toBe("function");
+  });
+
   it("throws a clear error for an unregistered county", () => {
     expect(() => getCountyAdapter("Roscommon")).toThrow(
       'No CountyParcelAdapter registered for county "Roscommon"'

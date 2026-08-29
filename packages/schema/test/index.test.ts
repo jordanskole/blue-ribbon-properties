@@ -26,7 +26,7 @@ describe("package public API", () => {
   });
 
   it("exports getLayer and LAYER_REGISTRY", () => {
-    expect(LAYER_REGISTRY).toHaveLength(7);
+    expect(LAYER_REGISTRY).toHaveLength(8);
     expect(getLayer("ssurgo_sda").name).toBe("SSURGO via Soil Data Access");
   });
 });

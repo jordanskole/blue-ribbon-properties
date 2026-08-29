@@ -69,6 +69,15 @@ export const LAYER_REGISTRY: readonly LayerDef[] = [
     feeds: ["identity.parcel_id", "identity.county", "identity.township", "identity.acres"],
   },
   {
+    id: "mgf_minor_civil_division",
+    name: "Michigan Geographic Framework — Minor Civil Division (Cities & Townships)",
+    source:
+      "https://services3.arcgis.com/dxRQUfTDNtfqZ301/arcgis/rest/services/MinorCivilDivision/FeatureServer/6",
+    geometry_type: "polygon",
+    source_type: "periodic",
+    feeds: ["identity.township"],
+  },
+  {
     id: "usgs_3dep_dem",
     name: "USGS 3DEP elevation tile",
     source: "https://www.usgs.gov/3d-elevation-program",
