@@ -1,0 +1,8 @@
+{
+  "name": "blue-ribbon-properties",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}
