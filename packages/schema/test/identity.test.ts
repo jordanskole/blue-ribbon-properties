@@ -38,6 +38,17 @@ describe("validateIdentity", () => {
     expect(errors).toEqual([]);
   });
 
+  it("accepts Roscommon's 4-digit last-segment PIN shape", () => {
+    const errors = validateIdentity(
+      makeIdentity({
+        parcel_id: "011-430-045-0000",
+        county: "Roscommon",
+        township: "Roscommon",
+      })
+    );
+    expect(errors).toEqual([]);
+  });
+
   it("rejects an empty county", () => {
     const errors = validateIdentity(makeIdentity({ county: "  " }));
     expect(errors).toContain("county must not be empty");
