@@ -5,6 +5,7 @@ import type {
   GeoJSONPolygon,
 } from "./types.js";
 import { polygonCentroid, fetchTownship } from "./shared/township-lookup.js";
+import { toEsriRings, assertNoArcgisError, fetchAllEsriPages } from "./shared/esri-geometry.js";
 
 const PROXY_BASE = "https://app.fetchgis.com/proxy/ags/proxy.ashx?";
 const PARCEL_FEATURESERVER_QUERY_URL =
@@ -18,6 +19,11 @@ interface EsriQueryResponse {
     attributes: Record<string, unknown>;
     geometry: { rings: number[][][] };
   }>;
+  // Unlike Osceola/Roscommon's f=geojson responses (where this flag lives
+  // nested at body.properties.exceededTransferLimit), Iosco's proxy is
+  // queried with f=json and carries the flag at the top level -- verified
+  // live 2026-08-29 against the FetchGIS proxy endpoint.
+  exceededTransferLimit?: boolean;
 }
 
 /** Iosco PINs render canonically as "062-026-300-020-00" -- 5 segments,
@@ -83,23 +89,44 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
 export async function fetchParcelsIntersecting(
   polygon: GeoJSONPolygon
 ): Promise<RawParcelFeature[]> {
+  // toEsriRings flattens a MultiPolygon buffer (see Osceola's identical
+  // fix) into the single flat `rings` array Esri's geometry model expects.
   const geometryParam = JSON.stringify({
-    rings: polygon.coordinates,
+    rings: toEsriRings(polygon),
     spatialReference: { wkid: 4326 },
   });
-  const innerQuery =
-    `f=json&geometry=${encodeURIComponent(geometryParam)}&geometryType=esriGeometryPolygon` +
-    `&spatialRel=esriSpatialRelIntersects&inSR=4326&outFields=TaxID,Shape_Area`;
-  const url = `${PROXY_BASE}${PARCEL_FEATURESERVER_QUERY_URL}?${innerQuery}`;
-  const res = await fetch(url, { headers: { Referer: FETCHGIS_REFERER } });
-  if (!res.ok) {
-    throw new Error(
-      `Iosco FeatureServer intersects request failed: ${res.status} ${res.statusText}`
-    );
+
+  async function fetchPage(
+    resultOffset: number,
+    resultRecordCount: number | undefined
+  ): Promise<{ features: EsriQueryResponse["features"]; exceededTransferLimit: boolean }> {
+    let innerQuery =
+      `f=json&geometry=${encodeURIComponent(geometryParam)}&geometryType=esriGeometryPolygon` +
+      `&spatialRel=esriSpatialRelIntersects&inSR=4326&outFields=TaxID,Shape_Area` +
+      `&resultOffset=${resultOffset}`;
+    if (resultRecordCount !== undefined) {
+      innerQuery += `&resultRecordCount=${resultRecordCount}`;
+    }
+    const url = `${PROXY_BASE}${PARCEL_FEATURESERVER_QUERY_URL}?${innerQuery}`;
+    const res = await fetch(url, { headers: { Referer: FETCHGIS_REFERER } });
+    if (!res.ok) {
+      throw new Error(
+        `Iosco FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+      );
+    }
+    const body = (await res.json()) as EsriQueryResponse;
+    // ArcGIS can respond 200 with an error payload instead of a non-2xx
+    // status -- catch that before touching .features.
+    assertNoArcgisError(body, "Iosco FeatureServer intersects request");
+    return {
+      features: body.features,
+      exceededTransferLimit: body.exceededTransferLimit === true,
+    };
   }
-  const body = (await res.json()) as EsriQueryResponse;
+
+  const rawFeatures = await fetchAllEsriPages(fetchPage);
   const results: RawParcelFeature[] = [];
-  for (const feature of body.features) {
+  for (const feature of rawFeatures) {
     const ringWgs84 = feature.geometry.rings[0].map(([x, y]) => webMercatorToWgs84(x, y)) as [
       number,
       number,

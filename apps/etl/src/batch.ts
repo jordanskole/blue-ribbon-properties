@@ -3,7 +3,11 @@ import { BLUE_RIBBON_STREAMS_LP } from "./data/blue-ribbon-streams.js";
 import { fetchLowerPeninsulaCounties } from "./fetch/county-boundaries.js";
 import { resolveStreamGeometry } from "./fetch/blue-ribbon-geometry.js";
 import { openSpatialSession, closeSpatialSession } from "./duckdb/load.js";
-import { bufferGeometry, computeIntersectingCounties } from "./duckdb/buffer.js";
+import {
+  bufferGeometry,
+  computeIntersectingCounties,
+  loadCountiesForIntersectionCheck,
+} from "./duckdb/buffer.js";
 import { getCountyAdapter } from "./counties/registry.js";
 import { deriveCardForParcel } from "./index.js";
 import { openStore, hasCard, insertCard, exportParquet, closeStore } from "./duckdb/store.js";
@@ -41,92 +45,121 @@ export async function runBlueRibbonCorridorBatch(
 
   const lpCounties = await fetchLowerPeninsulaCounties();
   const store = await openStore(storePath);
-  const geoSession = await openSpatialSession();
-  const additionalCounties = new Set<string>();
 
-  // Both DuckDB connections must be released on every exit path, including a
+  // Each DuckDB connection must be released on every exit path, including a
   // thrown error partway through -- an unclosed connection left the node
   // process hanging indefinitely after a failed run (2026-08-29) instead of
-  // exiting once the run finished.
+  // exiting once the run finished. Nesting store's try/finally around
+  // geoSession's (rather than opening both before either try begins) closes
+  // a narrow leak window: if openSpatialSession() itself throws, store's
+  // connection is still guaranteed to close.
   try {
-    for (const county of corridorCounties) {
-      let streamsForCounty = BLUE_RIBBON_STREAMS_LP.filter((s) => s.counties.includes(county));
-      if (options.streamNames) {
-        streamsForCounty = streamsForCounty.filter((s) => options.streamNames!.includes(s.name));
-      }
-      const adapter = getCountyAdapter(county);
+    const geoSession = await openSpatialSession();
+    try {
+      // Loaded once per run, not once per stream -- see
+      // loadCountiesForIntersectionCheck's own comment for why.
+      await loadCountiesForIntersectionCheck(geoSession, lpCounties);
+      const additionalCounties = new Set<string>();
 
-      for (const record of streamsForCounty) {
-        const resolved = await resolveStreamGeometry(record, lpCounties);
-        if (resolved === null) {
-          summary.failures.push({
-            pin: "",
-            county,
-            error: `No MiEnviro geometry matched for stream "${record.name}" in ${county}`,
-          });
-          continue;
+      for (const county of corridorCounties) {
+        let streamsForCounty = BLUE_RIBBON_STREAMS_LP.filter((s) => s.counties.includes(county));
+        if (options.streamNames) {
+          streamsForCounty = streamsForCounty.filter((s) => options.streamNames!.includes(s.name));
         }
+        const adapter = getCountyAdapter(county);
 
-        const buffer = await bufferGeometry(geoSession, resolved.geometry, BUFFER_METERS);
-
-        const intersectingCounties = await computeIntersectingCounties(geoSession, buffer, lpCounties);
-        for (const c of intersectingCounties) {
-          if (!corridorCounties.includes(c)) {
-            additionalCounties.add(c);
-          }
-        }
-
-        const candidates = await adapter.fetchParcelsIntersecting(buffer);
-        summary.candidatesFound += candidates.length;
-
-        for (const raw of candidates) {
-          // adapter.normalize can throw on a single real-world edge case
-          // (e.g. a genuinely MultiPolygon parcel -- live-verified
-          // 2026-08-29 near Middle Branch River -- which every adapter's
-          // normalize() rejects rather than attempting to support end to
-          // end). That must record a per-parcel failure and move on, not
-          // abort every remaining stream/county in the batch: a single
-          // uncommon candidate crashing the whole run is a robustness gap,
-          // not the "filter only on the universe" this repo requires.
-          let normalized;
+        for (const record of streamsForCounty) {
+          // The per-stream operations (resolving geometry, buffering,
+          // computing intersecting counties, fetching candidates) are not
+          // per-candidate-isolated like the loop below -- a single bad
+          // stream (a network error, a MultiPolygon edge case an adapter
+          // doesn't yet handle, etc.) must not abort every remaining
+          // stream/county in the batch. Record a failure and move to the
+          // next stream instead, consistent with the per-candidate
+          // isolation already below.
+          let candidates;
           try {
-            normalized = adapter.normalize(raw);
+            const resolved = await resolveStreamGeometry(record, lpCounties);
+            if (resolved === null) {
+              summary.failures.push({
+                pin: "",
+                county,
+                error: `No MiEnviro geometry matched for stream "${record.name}" in ${county}`,
+              });
+              continue;
+            }
+
+            const buffer = await bufferGeometry(geoSession, resolved.geometry, BUFFER_METERS);
+
+            const intersectingCounties = await computeIntersectingCounties(geoSession, buffer);
+            for (const c of intersectingCounties) {
+              if (!corridorCounties.includes(c)) {
+                additionalCounties.add(c);
+              }
+            }
+
+            candidates = await adapter.fetchParcelsIntersecting(buffer);
           } catch (err) {
             summary.failures.push({
-              pin: String(
-                raw.properties.PIN ?? raw.properties.TaxID ?? raw.properties.pin ?? "unknown"
-              ),
+              pin: "",
               county,
               error: err instanceof Error ? err.message : String(err),
             });
             continue;
           }
 
-          const alreadyStored = await hasCard(store, normalized.pin);
-          if (alreadyStored) {
-            summary.cardsSkipped += 1;
-            continue;
-          }
-          try {
-            const card: CardDef = await deriveCardForParcel(normalized);
-            await insertCard(store, card);
-            summary.cardsWritten += 1;
-          } catch (err) {
-            summary.failures.push({
-              pin: normalized.pin,
-              county,
-              error: err instanceof Error ? err.message : String(err),
-            });
+          summary.candidatesFound += candidates.length;
+
+          for (const raw of candidates) {
+            // adapter.normalize can throw on a single real-world edge case
+            // (e.g. a genuinely MultiPolygon parcel -- live-verified
+            // 2026-08-29 near Middle Branch River -- which every adapter's
+            // normalize() rejects rather than attempting to support end to
+            // end). That must record a per-parcel failure and move on, not
+            // abort every remaining stream/county in the batch: a single
+            // uncommon candidate crashing the whole run is a robustness gap,
+            // not the "filter only on the universe" this repo requires.
+            let normalized;
+            try {
+              normalized = adapter.normalize(raw);
+            } catch (err) {
+              summary.failures.push({
+                pin: String(
+                  raw.properties.PIN ?? raw.properties.TaxID ?? raw.properties.pin ?? "unknown"
+                ),
+                county,
+                error: err instanceof Error ? err.message : String(err),
+              });
+              continue;
+            }
+
+            const alreadyStored = await hasCard(store, normalized.pin);
+            if (alreadyStored) {
+              summary.cardsSkipped += 1;
+              continue;
+            }
+            try {
+              const card: CardDef = await deriveCardForParcel(normalized);
+              await insertCard(store, card);
+              summary.cardsWritten += 1;
+            } catch (err) {
+              summary.failures.push({
+                pin: normalized.pin,
+                county,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
           }
         }
       }
+
+      await exportParquet(store, storePath.replace(/\.duckdb$/, ".parquet"));
+      summary.additionalCountiesFound = [...additionalCounties].sort();
+      return summary;
+    } finally {
+      closeSpatialSession(geoSession);
     }
-
-    await exportParquet(store, storePath.replace(/\.duckdb$/, ".parquet"));
-    summary.additionalCountiesFound = [...additionalCounties].sort();
-    return summary;
   } finally {
-    closeSpatialSession(geoSession);
     closeStore(store);
   }
 }

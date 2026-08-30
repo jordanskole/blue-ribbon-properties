@@ -136,8 +136,68 @@ export async function insertCard(session: StoreSession, card: CardDef): Promise<
     card.prominence_ft.vintage.as_of,
     card.prominence_ft.vintage.note ?? null,
   ];
+  // Explicit column list, in the same order as CREATE_TABLE_SQL and the
+  // params array above -- 51 positional columns of mostly-interchangeable
+  // types (many DOUBLE/TEXT/BOOLEAN columns in a row) meant a future DDL
+  // reordering could silently corrupt data with no type error to catch it.
+  const columns = [
+    "parcel_id",
+    "county",
+    "township",
+    "identity_acres_value",
+    "identity_acres_provenance",
+    "identity_acres_vintage_as_of",
+    "identity_acres_vintage_note",
+    "groundwater_thermal_class_value",
+    "groundwater_thermal_class_provenance",
+    "groundwater_thermal_class_vintage_as_of",
+    "groundwater_thermal_class_vintage_note",
+    "groundwater_designated_trout_stream_value",
+    "groundwater_designated_trout_stream_provenance",
+    "groundwater_designated_trout_stream_vintage_as_of",
+    "groundwater_designated_trout_stream_vintage_note",
+    "groundwater_flowing_wells_nearby_value",
+    "groundwater_flowing_wells_nearby_provenance",
+    "groundwater_flowing_wells_nearby_vintage_as_of",
+    "groundwater_flowing_wells_nearby_vintage_note",
+    "dry_wet_adjacency_dry_acres_value",
+    "dry_wet_adjacency_dry_acres_provenance",
+    "dry_wet_adjacency_dry_acres_vintage_as_of",
+    "dry_wet_adjacency_dry_acres_vintage_note",
+    "dry_wet_adjacency_wet_acres_value",
+    "dry_wet_adjacency_wet_acres_provenance",
+    "dry_wet_adjacency_wet_acres_vintage_as_of",
+    "dry_wet_adjacency_wet_acres_vintage_note",
+    "dry_wet_adjacency_dominant_dry_soil_value",
+    "dry_wet_adjacency_dominant_dry_soil_provenance",
+    "dry_wet_adjacency_dominant_dry_soil_vintage_as_of",
+    "dry_wet_adjacency_dominant_dry_soil_vintage_note",
+    "dry_wet_adjacency_adjacent_value",
+    "dry_wet_adjacency_adjacent_provenance",
+    "dry_wet_adjacency_adjacent_vintage_as_of",
+    "dry_wet_adjacency_adjacent_vintage_note",
+    "relief_envelope_to_water_ft_value",
+    "relief_envelope_to_water_ft_provenance",
+    "relief_envelope_to_water_ft_vintage_as_of",
+    "relief_envelope_to_water_ft_vintage_note",
+    "wetland_wetland_pct_value",
+    "wetland_wetland_pct_provenance",
+    "wetland_wetland_pct_vintage_as_of",
+    "wetland_wetland_pct_vintage_note",
+    "wetland_wetland_between_envelope_and_water_value",
+    "wetland_wetland_between_envelope_and_water_provenance",
+    "wetland_wetland_between_envelope_and_water_vintage_as_of",
+    "wetland_wetland_between_envelope_and_water_vintage_note",
+    "prominence_ft_value",
+    "prominence_ft_provenance",
+    "prominence_ft_vintage_as_of",
+    "prominence_ft_vintage_note",
+  ];
   const placeholders = params.map((_, i) => `$${i + 1}`).join(", ");
-  await session.connection.run(`INSERT INTO cards VALUES (${placeholders})`, params);
+  await session.connection.run(
+    `INSERT INTO cards (${columns.join(", ")}) VALUES (${placeholders})`,
+    params
+  );
 }
 
 export async function exportParquet(session: StoreSession, parquetPath: string): Promise<void> {

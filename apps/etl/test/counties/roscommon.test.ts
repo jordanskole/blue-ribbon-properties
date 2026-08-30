@@ -115,4 +115,81 @@ describe("roscommon fetchParcelsIntersecting", () => {
     const features = await fetchParcelsIntersecting(polygon);
     expect(features).toEqual([]);
   });
+
+  it("throws a clear error on an HTTP-200-with-in-body-error response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          error: { code: 400, message: "Cannot perform query. Invalid query parameters." },
+        }),
+      }))
+    );
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    await expect(fetchParcelsIntersecting(polygon)).rejects.toThrow(
+      /ArcGIS error 400: Cannot perform query/
+    );
+  });
+
+  it("flattens a MultiPolygon buffer into one flat rings array in the request geometry", async () => {
+    let requestedInit: RequestInit | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("MinorCivilDivision")) {
+          return { ok: true, json: async () => ({ features: [] }) };
+        }
+        requestedInit = init;
+        return { ok: true, json: async () => ({ features: [] }) };
+      })
+    );
+    const multiPolygon = {
+      type: "MultiPolygon" as const,
+      coordinates: [
+        [[[-84.78, 44.32], [-84.77, 44.32], [-84.77, 44.33], [-84.78, 44.32]]],
+        [[[-84.6, 44.5], [-84.59, 44.5], [-84.59, 44.51], [-84.6, 44.5]]],
+      ],
+    };
+    await fetchParcelsIntersecting(multiPolygon);
+    const body = String(requestedInit?.body);
+    const params = new URLSearchParams(body);
+    const geometry = JSON.parse(params.get("geometry")!);
+    expect(geometry.rings).toHaveLength(2);
+  });
+
+  it("pages through results when the server reports exceededTransferLimit", async () => {
+    const ring = [[-84.775, 44.328], [-84.774, 44.328], [-84.774, 44.329], [-84.775, 44.328]];
+    const page1 = {
+      properties: { exceededTransferLimit: true },
+      features: [
+        { type: "Feature", properties: { PIN: "011-430-045-0001", Shape__Area: 1000 }, geometry: { type: "Polygon", coordinates: [ring] } },
+        { type: "Feature", properties: { PIN: "011-430-045-0002", Shape__Area: 1000 }, geometry: { type: "Polygon", coordinates: [ring] } },
+      ],
+    };
+    const page2 = {
+      properties: { exceededTransferLimit: false },
+      features: [
+        { type: "Feature", properties: { PIN: "011-430-045-0003", Shape__Area: 1000 }, geometry: { type: "Polygon", coordinates: [ring] } },
+      ],
+    };
+    const mcdResponse = { features: [{ attributes: { Name: "Roscommon" } }] };
+    const seenOffsets: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("MinorCivilDivision")) {
+          return { ok: true, json: async () => mcdResponse };
+        }
+        const params = new URLSearchParams(String(init?.body));
+        const offset = params.get("resultOffset")!;
+        seenOffsets.push(offset);
+        return { ok: true, json: async () => (offset === "0" ? page1 : page2) };
+      })
+    );
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toHaveLength(3);
+    expect(seenOffsets).toEqual(["0", "2"]);
+  });
 });

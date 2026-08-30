@@ -4,6 +4,7 @@ import type {
   NormalizedParcelRecord,
   GeoJSONPolygon,
 } from "./types.js";
+import { toEsriRings, assertNoArcgisError, fetchAllEsriPages } from "./shared/esri-geometry.js";
 
 const FEATURE_SERVER_URL =
   "https://services8.arcgis.com/FmKMwUEmDSC75SQm/arcgis/rest/services/OsceolaCountyParcels_view/FeatureServer/0/query";
@@ -41,37 +42,68 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
 export async function fetchParcelsIntersecting(
   polygon: GeoJSONPolygon
 ): Promise<RawParcelFeature[]> {
+  // toEsriRings flattens a MultiPolygon (e.g. Pine River's buffer, whose
+  // disjoint segments ST_Buffer doesn't merge into one blob -- live-verified
+  // 2026-08-29) into the single flat `rings` array Esri's geometry model
+  // expects; a plain Polygon passes through unchanged.
   const geometryParam = JSON.stringify({
-    rings: polygon.coordinates,
+    rings: toEsriRings(polygon),
     spatialReference: { wkid: 4326 },
   });
-  // POST, not GET -- a real Blue Ribbon corridor buffer (a whole river's
-  // segments within a county, 1000m buffer) produces a geometry parameter
-  // far larger than a single parcel's, and embedding it in a GET query
-  // string overflowed IIS's request-line limit ("400 Bad Request - Request
-  // Too Long", live-verified 2026-08-29 against Middle Branch River). The
-  // ArcGIS REST query endpoint accepts the identical parameter set as a
-  // POST body instead.
-  const body = new URLSearchParams({
-    geometry: geometryParam,
-    geometryType: "esriGeometryPolygon",
-    spatialRel: "esriSpatialRelIntersects",
-    inSR: "4326",
-    outFields: "PIN,OWNER,PROPCLASS,UNIT,Shape__Area",
-    f: "geojson",
-  });
-  const res = await fetch(FEATURE_SERVER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `Osceola FeatureServer intersects request failed: ${res.status} ${res.statusText}`
-    );
+
+  async function fetchPage(
+    resultOffset: number,
+    resultRecordCount: number | undefined
+  ): Promise<{ features: RawParcelFeature[]; exceededTransferLimit: boolean }> {
+    const params: Record<string, string> = {
+      geometry: geometryParam,
+      geometryType: "esriGeometryPolygon",
+      spatialRel: "esriSpatialRelIntersects",
+      inSR: "4326",
+      outFields: "PIN,OWNER,PROPCLASS,UNIT,Shape__Area",
+      f: "geojson",
+      resultOffset: String(resultOffset),
+    };
+    if (resultRecordCount !== undefined) {
+      params.resultRecordCount = String(resultRecordCount);
+    }
+    const body = new URLSearchParams(params);
+    // POST, not GET -- a real Blue Ribbon corridor buffer (a whole river's
+    // segments within a county, 1000m buffer) produces a geometry parameter
+    // far larger than a single parcel's, and embedding it in a GET query
+    // string overflowed IIS's request-line limit ("400 Bad Request - Request
+    // Too Long", live-verified 2026-08-29 against Middle Branch River). The
+    // ArcGIS REST query endpoint accepts the identical parameter set as a
+    // POST body instead.
+    const res = await fetch(FEATURE_SERVER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Osceola FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+      );
+    }
+    const responseBody = (await res.json()) as {
+      features: RawParcelFeature[];
+      properties?: { exceededTransferLimit?: boolean };
+    };
+    // ArcGIS can respond 200 with an error payload instead of a non-2xx
+    // status (live-verified 2026-08-29) -- catch that before touching
+    // .features, which would otherwise be undefined.
+    assertNoArcgisError(responseBody, "Osceola FeatureServer intersects request");
+    return {
+      features: responseBody.features,
+      exceededTransferLimit: responseBody.properties?.exceededTransferLimit === true,
+    };
   }
-  const responseBody = (await res.json()) as { features: RawParcelFeature[] };
-  return responseBody.features;
+
+  // Osceola's FeatureServer caps at maxRecordCount: 2000 -- a single 6-mile
+  // stream already returns 839 real candidates, and Pine River (57 miles)
+  // returns far more, so this must page through the full result set rather
+  // than silently truncating at the server's cap.
+  return fetchAllEsriPages(fetchPage);
 }
 
 export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {

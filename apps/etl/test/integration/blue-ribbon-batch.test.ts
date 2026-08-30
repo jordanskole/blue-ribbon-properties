@@ -30,6 +30,10 @@ describe("Blue Ribbon corridor batch, real network, real DuckDB (npm run test:in
       for (const [error, count] of failureCounts) {
         console.log(`  x${count}: ${error}`);
       }
+      // The design spec calls for the byproduct county list -- counties
+      // beyond the 3 with adapters today that a stream's buffer also
+      // touches -- to be "printed as part of the batch run's output".
+      console.log("additionalCountiesFound:", summary.additionalCountiesFound);
 
       expect(summary.candidatesFound).toBeGreaterThan(0);
       expect(summary.cardsWritten).toBeGreaterThan(0);

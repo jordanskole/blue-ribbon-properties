@@ -5,6 +5,7 @@ import type {
   GeoJSONPolygon,
 } from "./types.js";
 import { polygonCentroid, fetchTownship } from "./shared/township-lookup.js";
+import { toEsriRings, assertNoArcgisError, fetchAllEsriPages } from "./shared/esri-geometry.js";
 
 // The live/visible parcel layer in the county's own webmap -- verified
 // against a second, hidden "2027_Parcel_Layer2026826" layer with identical
@@ -78,35 +79,63 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
 export async function fetchParcelsIntersecting(
   polygon: GeoJSONPolygon
 ): Promise<RawParcelFeature[]> {
+  // toEsriRings flattens a MultiPolygon buffer (see Osceola's identical
+  // fix) into the single flat `rings` array Esri's geometry model expects.
   const geometryParam = JSON.stringify({
-    rings: polygon.coordinates,
+    rings: toEsriRings(polygon),
     spatialReference: { wkid: 4326 },
   });
-  // POST, not GET -- same fix as Osceola's identical pattern: a real
-  // corridor buffer's geometry parameter overflows a GET URL's length limit
-  // (live-verified 2026-08-29 against Osceola's FeatureServer, same
-  // ArcGIS-Online-hosted shape as this one; "400 Request Too Long").
-  const requestBody = new URLSearchParams({
-    f: "geojson",
-    geometry: geometryParam,
-    geometryType: "esriGeometryPolygon",
-    spatialRel: "esriSpatialRelIntersects",
-    inSR: "4326",
-    outFields: "PIN,Shape__Area",
-  });
-  const res = await fetch(PARCEL_FEATURESERVER_QUERY_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: requestBody.toString(),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `Roscommon FeatureServer intersects request failed: ${res.status} ${res.statusText}`
-    );
+
+  async function fetchPage(
+    resultOffset: number,
+    resultRecordCount: number | undefined
+  ): Promise<{ features: GeoJsonFeature[]; exceededTransferLimit: boolean }> {
+    const params: Record<string, string> = {
+      f: "geojson",
+      geometry: geometryParam,
+      geometryType: "esriGeometryPolygon",
+      spatialRel: "esriSpatialRelIntersects",
+      inSR: "4326",
+      outFields: "PIN,Shape__Area",
+      resultOffset: String(resultOffset),
+    };
+    if (resultRecordCount !== undefined) {
+      params.resultRecordCount = String(resultRecordCount);
+    }
+    const requestBody = new URLSearchParams(params);
+    // POST, not GET -- same fix as Osceola's identical pattern: a real
+    // corridor buffer's geometry parameter overflows a GET URL's length limit
+    // (live-verified 2026-08-29 against Osceola's FeatureServer, same
+    // ArcGIS-Online-hosted shape as this one; "400 Request Too Long").
+    const res = await fetch(PARCEL_FEATURESERVER_QUERY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: requestBody.toString(),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Roscommon FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+      );
+    }
+    const body = (await res.json()) as GeoJsonFeatureCollection & {
+      properties?: { exceededTransferLimit?: boolean };
+    };
+    // ArcGIS can respond 200 with an error payload instead of a non-2xx
+    // status (live-verified 2026-08-29 against Osceola's identical shape of
+    // FeatureServer) -- catch that before touching .features.
+    assertNoArcgisError(body, "Roscommon FeatureServer intersects request");
+    return {
+      features: body.features,
+      exceededTransferLimit: body.properties?.exceededTransferLimit === true,
+    };
   }
-  const body = (await res.json()) as GeoJsonFeatureCollection;
+
+  // Same ArcGIS-Online-hosted shape as Osceola's FeatureServer, likely the
+  // same maxRecordCount cap -- page through the full result set rather than
+  // silently truncating at the server's transfer limit.
+  const rawFeatures = await fetchAllEsriPages(fetchPage);
   const results: RawParcelFeature[] = [];
-  for (const feature of body.features) {
+  for (const feature of rawFeatures) {
     if (feature.geometry.type !== "Polygon") continue;
     const ring = (feature.geometry.coordinates as number[][][])[0] as [number, number][];
     const [centroidLng, centroidLat] = polygonCentroid(ring);

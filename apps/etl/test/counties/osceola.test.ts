@@ -107,4 +107,78 @@ describe("osceola fetchParcelsIntersecting", () => {
       "Osceola FeatureServer intersects request failed: 500 Internal Server Error"
     );
   });
+
+  it("throws a clear error on an HTTP-200-with-in-body-error response", async () => {
+    // Live-verified 2026-08-29: a malformed query to Osceola's FeatureServer
+    // returns HTTP 200 with {"error":{"code":400,"message":"..."}}. The
+    // res.ok check alone misses this, and reading body.features would
+    // otherwise crash with an unrelated-looking TypeError.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          error: { code: 400, message: "Cannot perform query. Invalid query parameters." },
+        }),
+      }))
+    );
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    await expect(fetchParcelsIntersecting(polygon)).rejects.toThrow(
+      /ArcGIS error 400: Cannot perform query/
+    );
+  });
+
+  it("flattens a MultiPolygon buffer into one flat rings array in the request geometry", async () => {
+    let requestedInit: RequestInit | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        requestedInit = init;
+        return { ok: true, json: async () => ({ features: [] }) };
+      })
+    );
+    const multiPolygon = {
+      type: "MultiPolygon" as const,
+      coordinates: [
+        [[[-85.13, 44.068], [-85.12, 44.068], [-85.12, 44.07], [-85.13, 44.068]]],
+        [[[-85.0, 44.2], [-84.99, 44.2], [-84.99, 44.21], [-85.0, 44.2]]],
+      ],
+    };
+    await fetchParcelsIntersecting(multiPolygon);
+    const body = String(requestedInit?.body);
+    const params = new URLSearchParams(body);
+    const geometry = JSON.parse(params.get("geometry")!);
+    // Two polygons' worth of rings (1 ring each here), flattened into one
+    // array -- not nested per-polygon.
+    expect(geometry.rings).toHaveLength(2);
+  });
+
+  it("pages through results when the server reports exceededTransferLimit", async () => {
+    const page1 = {
+      properties: { exceededTransferLimit: true },
+      features: [
+        { type: "Feature", properties: { PIN: "10 003 001 00", OWNER: "A", PROPCLASS: "X", UNIT: "MIDDLE BRANCH TOWNSHIP", Shape__Area: 1000 }, geometry: { type: "Polygon", coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] } },
+        { type: "Feature", properties: { PIN: "10 003 002 00", OWNER: "B", PROPCLASS: "X", UNIT: "MIDDLE BRANCH TOWNSHIP", Shape__Area: 1000 }, geometry: { type: "Polygon", coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] } },
+      ],
+    };
+    const page2 = {
+      properties: { exceededTransferLimit: false },
+      features: [
+        { type: "Feature", properties: { PIN: "10 003 003 00", OWNER: "C", PROPCLASS: "X", UNIT: "MIDDLE BRANCH TOWNSHIP", Shape__Area: 1000 }, geometry: { type: "Polygon", coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] } },
+      ],
+    };
+    const seenOffsets: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const params = new URLSearchParams(String(init?.body));
+        seenOffsets.push(params.get("resultOffset")!);
+        return { ok: true, json: async () => (params.get("resultOffset") === "0" ? page1 : page2) };
+      })
+    );
+    const polygon = { type: "Polygon" as const, coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]] };
+    const features = await fetchParcelsIntersecting(polygon);
+    expect(features).toHaveLength(3);
+    expect(seenOffsets).toEqual(["0", "2"]);
+  });
 });
