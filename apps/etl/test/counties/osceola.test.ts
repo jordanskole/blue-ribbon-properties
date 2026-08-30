@@ -58,7 +58,11 @@ describe("osceola fetchParcelsIntersecting", () => {
     vi.unstubAllGlobals();
   });
 
-  it("requests a polygon-intersects query and returns the raw features", async () => {
+  it("requests a polygon-intersects query via POST and returns the raw features", async () => {
+    // POST, not GET -- a real corridor buffer's geometry parameter is large
+    // enough to overflow a GET URL's length limit (live-verified 2026-08-29
+    // against Middle Branch River: IIS "400 Request Too Long"), so the
+    // geometry/query params must travel in the request body instead.
     const mockResponse = {
       features: [
         {
@@ -69,10 +73,12 @@ describe("osceola fetchParcelsIntersecting", () => {
       ],
     };
     let requestedUrl = "";
+    let requestedInit: RequestInit | undefined;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
         requestedUrl = url;
+        requestedInit = init;
         return { ok: true, json: async () => mockResponse };
       })
     );
@@ -83,8 +89,15 @@ describe("osceola fetchParcelsIntersecting", () => {
     const features = await fetchParcelsIntersecting(polygon);
     expect(features).toHaveLength(1);
     expect(features[0].properties.PIN).toBe("10 003 023 00");
-    expect(requestedUrl).toContain("geometryType=esriGeometryPolygon");
-    expect(requestedUrl).toContain("spatialRel=esriSpatialRelIntersects");
+    // No query string on the URL itself -- everything travels in the body.
+    expect(requestedUrl).not.toContain("?");
+    expect(requestedInit?.method).toBe("POST");
+    expect(requestedInit?.headers).toEqual({
+      "Content-Type": "application/x-www-form-urlencoded",
+    });
+    const body = String(requestedInit?.body);
+    expect(body).toContain("geometryType=esriGeometryPolygon");
+    expect(body).toContain("spatialRel=esriSpatialRelIntersects");
   });
 
   it("throws a clear error on an HTTP failure", async () => {

@@ -15,6 +15,14 @@ export async function openSpatialSession(): Promise<DuckDbSession> {
   return { connection };
 }
 
+/** Releases the session's connection. Every `openSpatialSession()` caller
+ * should close it (ideally in a `finally`) once done -- an unclosed
+ * connection left the batch runner's node process hanging after a query
+ * error (2026-08-29), rather than exiting once the run finished. */
+export function closeSpatialSession(session: DuckDbSession): void {
+  session.connection.closeSync();
+}
+
 export async function loadParcel(
   session: DuckDbSession,
   parcel: NormalizedParcelRecord

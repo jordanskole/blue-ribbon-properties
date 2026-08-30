@@ -56,4 +56,31 @@ describe("computeIntersectingCounties", () => {
     const result = await computeIntersectingCounties(session, bufferPolygon, [overlapping, disjoint]);
     expect(result).toEqual(["Overlapping"]);
   });
+
+  it("handles a MultiPolygon county boundary (e.g. islands/multi-part shoreline) without erroring", async () => {
+    const session = await openSpatialSession();
+    // A MultiPolygon county: one part overlaps the buffer, a second disjoint
+    // part (like an island far from shore) does not. Confirms
+    // ST_GeomFromGeoJSON accepts a correctly-typed MultiPolygon end to end
+    // (this is exactly the shape that broke when geometry.type was
+    // incorrectly hardcoded to "Polygon" -- see county-boundaries.ts).
+    const multiPolygonCounty: CountyBoundary = {
+      name: "Multi",
+      peninsula: "Lower",
+      geometry: {
+        type: "MultiPolygon",
+        coordinates: [
+          [[[-85.2, 44.0], [-85.0, 44.0], [-85.0, 44.2], [-85.2, 44.2], [-85.2, 44.0]]],
+          [[[-83.0, 44.0], [-82.8, 44.0], [-82.8, 44.2], [-83.0, 44.2], [-83.0, 44.0]]],
+        ],
+      },
+    };
+    const bufferPolygon: { type: "Polygon"; coordinates: number[][][] } = {
+      type: "Polygon",
+      coordinates: [[[-85.15, 44.05], [-85.05, 44.05], [-85.05, 44.15], [-85.15, 44.15], [-85.15, 44.05]]],
+    };
+
+    const result = await computeIntersectingCounties(session, bufferPolygon, [multiPolygonCounty]);
+    expect(result).toEqual(["Multi"]);
+  });
 });

@@ -10,8 +10,9 @@ afterEach(() => {
 });
 
 describe("bboxFromGeometry", () => {
-  it("computes a buffered bbox from polygon coordinates", () => {
+  it("computes a buffered bbox from Polygon coordinates", () => {
     const geometry = {
+      type: "Polygon",
       coordinates: [
         [
           [-85.13, 44.068],
@@ -27,6 +28,39 @@ describe("bboxFromGeometry", () => {
     expect(bbox[1]).toBeCloseTo(44.058, 5);
     expect(bbox[2]).toBeCloseTo(-85.118, 5);
     expect(bbox[3]).toBeCloseTo(44.079, 5);
+  });
+
+  it("computes a buffered bbox spanning every polygon in a MultiPolygon", () => {
+    // Two disjoint rectangles, e.g. a mainland county plus an island --
+    // the bbox must span both, not just the first polygon's ring.
+    const geometry = {
+      type: "MultiPolygon",
+      coordinates: [
+        [
+          [
+            [-85.13, 44.068],
+            [-85.128, 44.068],
+            [-85.128, 44.069],
+            [-85.13, 44.069],
+            [-85.13, 44.068],
+          ],
+        ],
+        [
+          [
+            [-84.9, 44.2],
+            [-84.89, 44.2],
+            [-84.89, 44.21],
+            [-84.9, 44.21],
+            [-84.9, 44.2],
+          ],
+        ],
+      ],
+    };
+    const bbox = bboxFromGeometry(geometry, 0.01);
+    expect(bbox[0]).toBeCloseTo(-85.14, 5); // min lon from the first polygon
+    expect(bbox[1]).toBeCloseTo(44.058, 5); // min lat from the first polygon
+    expect(bbox[2]).toBeCloseTo(-84.88, 5); // max lon from the second polygon
+    expect(bbox[3]).toBeCloseTo(44.22, 5); // max lat from the second polygon
   });
 });
 

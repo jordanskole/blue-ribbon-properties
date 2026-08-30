@@ -36,6 +36,37 @@ describe("fetchLowerPeninsulaCounties", () => {
     expect(requestedUrl).toContain("f=geojson");
   });
 
+  it("preserves a real MultiPolygon geometry type/coordinates instead of stamping Polygon", async () => {
+    // Live-verified 2026-08-29: several Lower Peninsula counties with islands
+    // or multi-part shorelines (e.g. Alpena) are genuinely MultiPolygon in the
+    // County FeatureServer's response -- this must round-trip untouched.
+    const multiPolygonCoords = [
+      [[[-83.4, 45.0], [-83.3, 45.0], [-83.3, 45.1], [-83.4, 45.1], [-83.4, 45.0]]],
+      [[[-83.2, 45.2], [-83.1, 45.2], [-83.1, 45.3], [-83.2, 45.3], [-83.2, 45.2]]],
+    ];
+    const mockResponse = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: { Name: "Alpena", Peninsula: "Lower" },
+          geometry: { type: "MultiPolygon", coordinates: multiPolygonCoords },
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => mockResponse }))
+    );
+    const counties = await fetchLowerPeninsulaCounties();
+    expect(counties).toHaveLength(1);
+    expect(counties[0]).toEqual({
+      name: "Alpena",
+      peninsula: "Lower",
+      geometry: { type: "MultiPolygon", coordinates: multiPolygonCoords },
+    });
+  });
+
   it("throws a clear error on an HTTP failure", async () => {
     vi.stubGlobal(
       "fetch",

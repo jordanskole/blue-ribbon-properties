@@ -82,11 +82,23 @@ export async function fetchParcelsIntersecting(
     rings: polygon.coordinates,
     spatialReference: { wkid: 4326 },
   });
-  const url =
-    `${PARCEL_FEATURESERVER_QUERY_URL}?f=geojson&geometry=${encodeURIComponent(geometryParam)}` +
-    `&geometryType=esriGeometryPolygon&spatialRel=esriSpatialRelIntersects&inSR=4326` +
-    `&outFields=PIN,Shape__Area`;
-  const res = await fetch(url);
+  // POST, not GET -- same fix as Osceola's identical pattern: a real
+  // corridor buffer's geometry parameter overflows a GET URL's length limit
+  // (live-verified 2026-08-29 against Osceola's FeatureServer, same
+  // ArcGIS-Online-hosted shape as this one; "400 Request Too Long").
+  const requestBody = new URLSearchParams({
+    f: "geojson",
+    geometry: geometryParam,
+    geometryType: "esriGeometryPolygon",
+    spatialRel: "esriSpatialRelIntersects",
+    inSR: "4326",
+    outFields: "PIN,Shape__Area",
+  });
+  const res = await fetch(PARCEL_FEATURESERVER_QUERY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: requestBody.toString(),
+  });
   if (!res.ok) {
     throw new Error(
       `Roscommon FeatureServer intersects request failed: ${res.status} ${res.statusText}`

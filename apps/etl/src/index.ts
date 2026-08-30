@@ -14,6 +14,7 @@ import {
 } from "./fetch/ssurgo.js";
 import {
   openSpatialSession,
+  closeSpatialSession,
   loadParcel,
   loadMiEnviroFeatures,
   loadSoilPolygons,
@@ -45,18 +46,29 @@ export async function deriveCardForParcel(parcel: NormalizedParcelRecord): Promi
   const mukeys = [...new Set(soilPolygons.map((p) => p.mukey))];
   const components = await fetchComponents(mukeys);
 
+  // Called once per candidate parcel from the batch runner, so an unclosed
+  // session here compounds into many leaked in-memory DuckDB instances
+  // across a real batch run -- see closeSpatialSession's doc comment.
   const session = await openSpatialSession();
-  await loadParcel(session, parcel);
-  await loadMiEnviroFeatures(session, "mienviro_1", coldStreams, ["TemperatureGradient"]);
-  await loadMiEnviroFeatures(session, "mienviro_32", troutStreams, ["Designated"]);
-  await loadSoilPolygons(session, soilPolygons);
+  let thermalClass: string | null;
+  let designatedTroutStream: boolean;
+  let soilAreas: Awaited<ReturnType<typeof computeSoilPolygonAreas>>;
+  let verifiedAcres: number;
+  try {
+    await loadParcel(session, parcel);
+    await loadMiEnviroFeatures(session, "mienviro_1", coldStreams, ["TemperatureGradient"]);
+    await loadMiEnviroFeatures(session, "mienviro_32", troutStreams, ["Designated"]);
+    await loadSoilPolygons(session, soilPolygons);
 
-  const [thermalClass, designatedTroutStream, soilAreas, verifiedAcres] = await Promise.all([
-    computeThermalClass(session),
-    computeDesignatedTroutStream(session),
-    computeSoilPolygonAreas(session),
-    computeParcelAcres(session),
-  ]);
+    [thermalClass, designatedTroutStream, soilAreas, verifiedAcres] = await Promise.all([
+      computeThermalClass(session),
+      computeDesignatedTroutStream(session),
+      computeSoilPolygonAreas(session),
+      computeParcelAcres(session),
+    ]);
+  } finally {
+    closeSpatialSession(session);
+  }
 
   const { dominantDry } = summarizeSoil(soilAreas, components);
   const dominantDrySoilRating = dominantDry

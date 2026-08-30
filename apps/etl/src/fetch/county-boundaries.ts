@@ -1,7 +1,11 @@
+export type CountyBoundaryGeometry =
+  | { type: "Polygon"; coordinates: number[][][] }
+  | { type: "MultiPolygon"; coordinates: number[][][][] };
+
 export interface CountyBoundary {
   name: string;
   peninsula: "Lower" | "Upper";
-  geometry: { type: "Polygon"; coordinates: number[][][] };
+  geometry: CountyBoundaryGeometry;
 }
 
 const COUNTY_FEATURESERVER_QUERY_URL =
@@ -11,7 +15,7 @@ interface CountyGeoJsonResponse {
   features: Array<{
     type: "Feature";
     properties: { Name: string; Peninsula: string };
-    geometry: { type: string; coordinates: number[][][] };
+    geometry: CountyBoundaryGeometry;
   }>;
 }
 
@@ -27,6 +31,12 @@ export async function fetchLowerPeninsulaCounties(): Promise<CountyBoundary[]> {
   return body.features.map((f) => ({
     name: f.properties.Name,
     peninsula: f.properties.Peninsula as "Lower" | "Upper",
-    geometry: { type: "Polygon", coordinates: f.geometry.coordinates },
+    // Preserve the API's real geometry type/coordinate nesting instead of
+    // stamping a fixed "Polygon" -- several Lower Peninsula counties with
+    // islands or multi-part shorelines (Alpena, Antrim, Arenac, Bay,
+    // Charlevoix, Emmet, Grand Traverse, Huron, Leelanau, Monroe, Presque
+    // Isle, Sanilac, Tuscola, Wayne, live-verified 2026-08-29) are genuinely
+    // MultiPolygon; mislabeling them broke ST_GeomFromGeoJSON downstream.
+    geometry: f.geometry,
   }));
 }

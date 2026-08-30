@@ -44,17 +44,34 @@ export function fetchDesignatedTroutStreams(bbox: BBox): Promise<MiEnviroFeature
   return queryLayer(32, bbox, ["GNISName", "RegulationType", "Designated"]);
 }
 
+/** Accepts a Polygon's rings (`coordinates: number[][][]`) or a MultiPolygon's
+ * per-polygon ring lists (`coordinates: number[][][][]`) -- callers include
+ * county boundaries (Task 2), which can legitimately be either shape. Every
+ * ring (including interior holes) is folded into the same min/max scan; holes
+ * are always contained within their polygon's exterior ring, so including
+ * them can't widen the bbox -- it just avoids having to pick out ring 0 of
+ * each polygon separately. */
 export function bboxFromGeometry(
-  geometry: { coordinates: number[][][] },
+  geometry: { type: string; coordinates: unknown },
   bufferDeg: number
 ): BBox {
-  const coords = geometry.coordinates[0];
-  const lons = coords.map((c) => c[0]);
-  const lats = coords.map((c) => c[1]);
-  return [
-    Math.min(...lons) - bufferDeg,
-    Math.min(...lats) - bufferDeg,
-    Math.max(...lons) + bufferDeg,
-    Math.max(...lats) + bufferDeg,
-  ];
+  const rings: number[][][] =
+    geometry.type === "MultiPolygon"
+      ? (geometry.coordinates as number[][][][]).flat()
+      : (geometry.coordinates as number[][][]);
+
+  let minLon = Infinity;
+  let minLat = Infinity;
+  let maxLon = -Infinity;
+  let maxLat = -Infinity;
+  for (const ring of rings) {
+    for (const [lon, lat] of ring) {
+      if (lon < minLon) minLon = lon;
+      if (lat < minLat) minLat = lat;
+      if (lon > maxLon) maxLon = lon;
+      if (lat > maxLat) maxLat = lat;
+    }
+  }
+
+  return [minLon - bufferDeg, minLat - bufferDeg, maxLon + bufferDeg, maxLat + bufferDeg];
 }

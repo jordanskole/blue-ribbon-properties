@@ -143,3 +143,10 @@ export async function insertCard(session: StoreSession, card: CardDef): Promise<
 export async function exportParquet(session: StoreSession, parquetPath: string): Promise<void> {
   await session.connection.run(`COPY cards TO '${parquetPath}' (FORMAT PARQUET)`);
 }
+
+/** Releases the store's connection. Every `openStore()` caller should close
+ * it (ideally in a `finally`) once done -- see `closeSpatialSession` in
+ * `load.ts` for why this matters. */
+export function closeStore(session: StoreSession): void {
+  session.connection.closeSync();
+}

@@ -45,18 +45,33 @@ export async function fetchParcelsIntersecting(
     rings: polygon.coordinates,
     spatialReference: { wkid: 4326 },
   });
-  const url =
-    `${FEATURE_SERVER_URL}?geometry=${encodeURIComponent(geometryParam)}` +
-    `&geometryType=esriGeometryPolygon&spatialRel=esriSpatialRelIntersects&inSR=4326` +
-    `&outFields=PIN,OWNER,PROPCLASS,UNIT,Shape__Area&f=geojson`;
-  const res = await fetch(url);
+  // POST, not GET -- a real Blue Ribbon corridor buffer (a whole river's
+  // segments within a county, 1000m buffer) produces a geometry parameter
+  // far larger than a single parcel's, and embedding it in a GET query
+  // string overflowed IIS's request-line limit ("400 Bad Request - Request
+  // Too Long", live-verified 2026-08-29 against Middle Branch River). The
+  // ArcGIS REST query endpoint accepts the identical parameter set as a
+  // POST body instead.
+  const body = new URLSearchParams({
+    geometry: geometryParam,
+    geometryType: "esriGeometryPolygon",
+    spatialRel: "esriSpatialRelIntersects",
+    inSR: "4326",
+    outFields: "PIN,OWNER,PROPCLASS,UNIT,Shape__Area",
+    f: "geojson",
+  });
+  const res = await fetch(FEATURE_SERVER_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
   if (!res.ok) {
     throw new Error(
       `Osceola FeatureServer intersects request failed: ${res.status} ${res.statusText}`
     );
   }
-  const body = (await res.json()) as { features: RawParcelFeature[] };
-  return body.features;
+  const responseBody = (await res.json()) as { features: RawParcelFeature[] };
+  return responseBody.features;
 }
 
 export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {

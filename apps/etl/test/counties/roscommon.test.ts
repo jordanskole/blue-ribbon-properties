@@ -58,7 +58,11 @@ describe("roscommon fetchParcelsIntersecting", () => {
     vi.unstubAllGlobals();
   });
 
-  it("requests a polygon-intersects query, enriches each candidate with township, and returns raw features", async () => {
+  it("requests a polygon-intersects query via POST, enriches each candidate with township, and returns raw features", async () => {
+    // POST, not GET -- same fix as Osceola's identical pattern: a real
+    // corridor buffer's geometry parameter overflows a GET URL's length
+    // limit (live-verified 2026-08-29 against the same kind of
+    // ArcGIS-Online-hosted FeatureServer Roscommon uses).
     const queryResponse = {
       features: [
         {
@@ -73,13 +77,17 @@ describe("roscommon fetchParcelsIntersecting", () => {
     };
     const mcdResponse = { features: [{ attributes: { Name: "Roscommon" } }] };
     let callCount = 0;
+    let parcelQueryInit: RequestInit | undefined;
+    let parcelQueryUrl = "";
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
         callCount += 1;
         if (url.includes("MinorCivilDivision")) {
           return { ok: true, json: async () => mcdResponse };
         }
+        parcelQueryUrl = url;
+        parcelQueryInit = init;
         return { ok: true, json: async () => queryResponse };
       })
     );
@@ -93,6 +101,12 @@ describe("roscommon fetchParcelsIntersecting", () => {
     expect(features[0].properties.Shape__Area).toBe(1046.76);
     expect(features[0].properties.township).toBe("Roscommon");
     expect(callCount).toBe(2); // parcel query + one MCD lookup for the one candidate
+    // No query string on the parcel query URL -- everything travels in the body.
+    expect(parcelQueryUrl).not.toContain("?");
+    expect(parcelQueryInit?.method).toBe("POST");
+    const body = String(parcelQueryInit?.body);
+    expect(body).toContain("geometryType=esriGeometryPolygon");
+    expect(body).toContain("f=geojson");
   });
 
   it("returns an empty array when nothing intersects, without erroring", async () => {
