@@ -49,6 +49,17 @@ describe("validateIdentity", () => {
     expect(errors).toEqual([]);
   });
 
+  it("accepts Iosco's platted-subdivision letter-block PIN shape", () => {
+    const errors = validateIdentity(
+      makeIdentity({
+        parcel_id: "051-A20-000-033-00",
+        county: "Iosco",
+        township: "Oscoda",
+      })
+    );
+    expect(errors).toEqual([]);
+  });
+
   it("rejects an empty county", () => {
     const errors = validateIdentity(makeIdentity({ county: "  " }));
     expect(errors).toContain("county must not be empty");

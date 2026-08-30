@@ -55,7 +55,13 @@ describe("iosco normalize", () => {
 
   it("throws a clear error for a malformed TaxID", () => {
     const raw = makeRawFeature({ TaxID: "not-a-pin" });
-    expect(() => normalize(raw)).toThrow('"not-a-pin" is not a valid NNN-NNN-NNN-NNN-NN PIN');
+    expect(() => normalize(raw)).toThrow('"not-a-pin" is not a valid');
+  });
+
+  it("accepts a platted-subdivision PIN with a letter+2-digit second segment", () => {
+    const raw = makeRawFeature({ TaxID: "051-A20-000-033-00" });
+    const result = normalize(raw);
+    expect(result.pin).toBe("051-A20-000-033-00");
   });
 
   it("throws a clear error for non-Polygon geometry", () => {

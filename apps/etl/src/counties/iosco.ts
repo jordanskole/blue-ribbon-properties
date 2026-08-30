@@ -29,10 +29,19 @@ interface EsriQueryResponse {
 /** Iosco PINs render canonically as "062-026-300-020-00" -- 5 segments,
  * unlike Osceola's 4-segment "10-003-013-20". The FeatureServer's TaxID
  * field already matches this canonical form, so no reformatting is needed
- * (unlike Osceola's space-separated raw PIN). */
+ * (unlike Osceola's space-separated raw PIN).
+ *
+ * The second segment is usually 3 digits (a numeric section code), but
+ * platted-subdivision parcels use a letter+2-digit block code instead --
+ * live-verified 2026-08-30 against a full corridor batch run: 43 real
+ * parcels on Imperial Dr in Tawas City (owners DeCoster, Herig, etc., a
+ * real platted subdivision) use PINs like "051-A20-000-033-00" and
+ * "051-E20-000-002-00". Both forms are accepted. */
 function assertValidPin(pin: string): void {
-  if (!/^\d{3}-\d{3}-\d{3}-\d{3}-\d{2}$/.test(pin)) {
-    throw new Error(`Iosco adapter: "${pin}" is not a valid NNN-NNN-NNN-NNN-NN PIN`);
+  if (!/^\d{3}-(?:\d{3}|[A-Z]\d{2})-\d{3}-\d{3}-\d{2}$/.test(pin)) {
+    throw new Error(
+      `Iosco adapter: "${pin}" is not a valid NNN-NNN-NNN-NNN-NN or NNN-LNN-NNN-NNN-NN PIN`
+    );
   }
 }
 
