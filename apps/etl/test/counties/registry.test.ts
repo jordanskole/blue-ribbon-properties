@@ -30,6 +30,13 @@ describe("getCountyAdapter", () => {
     expect(typeof adapter.normalize).toBe("function");
   });
 
+  it("resolves the Manistee adapter", () => {
+    const adapter = getCountyAdapter("Manistee");
+    expect(adapter.county).toBe("Manistee");
+    expect(typeof adapter.fetchParcel).toBe("function");
+    expect(typeof adapter.normalize).toBe("function");
+  });
+
   it("throws a clear error for an unregistered county", () => {
     expect(() => getCountyAdapter("Wexford")).toThrow(
       'No CountyParcelAdapter registered for county "Wexford"'
