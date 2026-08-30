@@ -55,3 +55,50 @@ county-code convention).
 
 **Decision:** set aside, not abandoned. Move to a different todo-list county next
 (Oscoda, Otsego, Alcona, Lake, Manistee, or Wexford) rather than keep forcing this one.
+
+---
+
+## Oscoda County adapter — blocked on a session-gated proprietary GIS backend
+
+**2026-08-30.** Picked after Otsego shipped, for the same "densest Blue Ribbon geography"
+reason as Crawford — Oscoda sits on the Au Sable's Mio stretch.
+
+**What's different here:** unlike the Esri-family vendors (Osceola/Roscommon's ArcGIS Online,
+Iosco/Otsego's FetchGIS-proxied on-prem ArcGIS Server), Oscoda's county GIS is **Beacon**, a
+Schneider Corporation product (`beacon.schneidercorp.com/Application.aspx?App=OscodaCountyMI`).
+It shows "Powered by Esri" branding, but that only covers the basemap raster tiles
+(`tilecache.blob.core.windows.net`) — the actual parcel data does not come from an anonymous
+Esri FeatureServer.
+
+**Why it's blocked:** live network capture (search for "Mio," clicked a real result — PIN
+`001-301-263-00`, 309 Mio Drive, Big Creek Township, 0.65 ac, confirmed real) showed:
+1. All parcel data — search, map-click detail, vector geometry — goes through a proprietary
+   `api/beaconCore/*` family (`QueryMapDetail`, `GetVectorLayer`, `SetResults`, `GetTabs`,
+   `UpdateMapExtent`), POST-only.
+2. Every call carries a `QPS=` query param — a per-page-load signed token, identical across
+   every call made in that session — that gates the request. No plain unauthenticated query
+   path was found.
+3. Calls are dispatched via `XMLHttpRequest`, not `fetch` — a `window.fetch` monkey-patch
+   (used successfully to reverse-engineer other counties' request shapes) caught nothing,
+   confirming the transport.
+4. Same structural shape as Crawford's blocker: real data exists and is reachable through the
+   UI, but there's no stable, anonymous, curl-able endpoint — just a session-signed API.
+
+**Genuinely new fact worth keeping regardless of the blocker:** Oscoda's PIN format is a
+**4-segment** `NNN-NNN-NNN-NN` (e.g. `001-301-263-00`) — shorter than the 5-segment
+`NNN-NNN-NNN-NNN-NN` shape every other county adapter so far has used (Osceola, Iosco,
+Roscommon, Otsego, and even blocked Crawford). If Oscoda ever gets unblocked,
+`packages/schema`'s `PIN_PATTERN` will need a fourth widening pass before it accepts this
+shape.
+
+**Not tried yet, real next steps if picked back up:**
+- Read Beacon's actual (unminified, if available) JS for how the `QPS` token is derived — it
+  may be a simple per-session HMAC that a scripted page-load-then-reuse flow could obtain
+  without full browser automation per parcel.
+- Check whether Oscoda's other listed GIS link, BS&A Online (`bsaonline.com/?uid=2047`), is a
+  usable alternative — likely assessor/tax data only, not parcel polygon geometry, so probably
+  insufficient for the corridor's spatial `fetchParcelsIntersecting` need, but not confirmed.
+- Drive the browser itself end-to-end per parcel (same fallback noted for Crawford) — sidesteps
+  the backend, doesn't fit this project's "fetch via HTTP" adapter pattern.
+
+**Decision:** set aside, not abandoned. Move to Alcona County next.
