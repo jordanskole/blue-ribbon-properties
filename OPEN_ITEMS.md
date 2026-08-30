@@ -102,3 +102,47 @@ shape.
   the backend, doesn't fit this project's "fetch via HTTP" adapter pattern.
 
 **Decision:** set aside, not abandoned. Move to Alcona County next.
+
+---
+
+## Alcona County adapter — blocked, no public spatial parcel layer found
+
+**2026-08-30.** Picked after Oscoda blocked. A different failure mode than the previous two —
+worth distinguishing since it changes what "picked back up later" would even mean.
+
+**What's different here:** Crawford and Oscoda both have *real, spatial* parcel data reachable
+through a UI, just gated behind a session/token wall a plain HTTP adapter can't get past.
+Alcona appears not to publish spatial parcel data at all:
+1. The county's own Equalization Department page (`alconacountymi.com/home/equalization-department/`)
+   links to exactly one system: BS&A Online (`bsaonline.com/?uid=1937`). No separate GIS/map
+   link anywhere on the page.
+2. `usparcelmaps.com`'s Michigan county-by-county parcel-viewer directory explicitly lists
+   Alcona as having no dedicated viewer (routes to its own `no_viewer.html`).
+3. Live-checked BS&A directly: it's a **paywalled tabular record lookup** ($6.95/record, or
+   free if you "claim" ownership) with Address/Name/Parcel-Number search tabs. A real search
+   (address "Main") returned live PINs confirming the shape — `072-110-003-003-00`,
+   `120-900-024-005-00`, `555-002-269-000-00` — the same 5-segment `NNN-NNN-NNN-NNN-NN` family
+   as Iosco/Otsego/Crawford. But opening an actual record shows **no map/GIS tab at all** —
+   only "Delinquent Tax Information" and "Building Department," both themselves paywalled.
+4. NEMCOG (the regional council of governments covering Alcona) has a GIS mapping page, but it
+   resolves to a generic healthcare/demographics ArcGIS Online web map with no parcel layer —
+   a dead end, not a lead.
+
+**Why this matters for the pattern:** this is the "ragged coverage" case `start-here.md`
+already names — "a null because a county has no digital parcel layer is a different fact from
+a null because the parcel has no wetland." If Alcona genuinely has no public parcel geometry
+source, that's not a reverse-engineering problem to solve later; it's a fact about the county
+that the corridor store may just need to carry as an explicit gap (a null with a "go ask the
+Equalization Department directly" pointer), same as any other never-ETL'd field.
+
+**Not tried yet, real next steps if picked back up:**
+- Call or email Alcona County's Equalization Department (989.724.9430, per search results) to
+  ask directly whether a parcel shapefile/GIS export exists that isn't publicly linked.
+- Check whether purchasing a single BS&A record ($6.95) exposes a map/sketch view that the free
+  tier hides — unconfirmed, and would require spending real money to verify.
+- Third-party aggregators (Regrid, Dynamo Spatial, Acres.com, mappingsolutionsgis.com) all claim
+  parcel coverage for Alcona — worth checking whether any offers a free/API tier, though this
+  would mean depending on a re-aggregator rather than the county's own authoritative source,
+  a different trust posture than every other adapter in this project.
+
+**Decision:** set aside, not abandoned. Move to Lake or Manistee County next.
