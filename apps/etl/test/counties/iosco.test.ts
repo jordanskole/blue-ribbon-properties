@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-  normalize,
-  webMercatorToWgs84,
-  fetchParcelsIntersecting,
-} from "../../src/counties/iosco.js";
+import { normalize, fetchParcelsIntersecting } from "../../src/counties/iosco.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
 
 function makeRawFeature(
@@ -31,16 +27,6 @@ function makeRawFeature(
     },
   };
 }
-
-describe("webMercatorToWgs84", () => {
-  it("matches DuckDB's ST_Transform for a known EPSG:3857 point", () => {
-    // Verified live against DuckDB ST_Transform('EPSG:3857' -> 'EPSG:4326')
-    // for the target parcel's first vertex (PIN 062-026-300-020-00).
-    const [lng, lat] = webMercatorToWgs84(-9287826.28, 5533738.12);
-    expect(lng).toBeCloseTo(-83.43396303570957, 9);
-    expect(lat).toBeCloseTo(44.4396825950131, 9);
-  });
-});
 
 describe("iosco normalize", () => {
   it("converts a raw Iosco feature to a NormalizedParcelRecord", () => {

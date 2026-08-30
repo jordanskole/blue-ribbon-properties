@@ -14,57 +14,51 @@ import {
 
 const PROXY_BASE = "https://app.fetchgis.com/proxy/ags/proxy.ashx?";
 const PARCEL_FEATURESERVER_QUERY_URL =
-  "https://app.fetchgis.com/geoservices/fgis/iosParcels/FeatureServer/0/query";
-// The FetchGIS proxy 403s without a Referer matching its own app -- verified
-// live; no other header is required.
-const FETCHGIS_REFERER = "https://app.fetchgis.com/?currentMap=iosco";
+  "https://app.fetchgis.com/geoservices/fgis/otsParcels/FeatureServer/0/query";
+// Same FetchGIS vendor/proxy as Iosco -- the proxy 403s without a Referer
+// matching its own app; no other header is required.
+const FETCHGIS_REFERER = "https://app.fetchgis.com/?currentMap=otsego";
 
 interface EsriQueryResponse {
   features: Array<{
     attributes: Record<string, unknown>;
     geometry: { rings: number[][][] };
   }>;
-  // Unlike Osceola/Roscommon's f=geojson responses (where this flag lives
-  // nested at body.properties.exceededTransferLimit), Iosco's proxy is
-  // queried with f=json and carries the flag at the top level -- verified
-  // live 2026-08-29 against the FetchGIS proxy endpoint.
+  // Same top-level (not nested under .properties) shape as Iosco's f=json
+  // proxy responses -- verified live 2026-08-30 against Otsego's own
+  // FeatureServer via the same proxy.
   exceededTransferLimit?: boolean;
 }
 
-/** Iosco PINs render canonically as "062-026-300-020-00" -- 5 segments,
- * unlike Osceola's 4-segment "10-003-013-20". The FeatureServer's TaxID
- * field already matches this canonical form, so no reformatting is needed
- * (unlike Osceola's space-separated raw PIN).
- *
- * The second segment is usually 3 digits (a numeric section code), but
- * platted-subdivision parcels use a letter+2-digit block code instead --
- * live-verified 2026-08-30 against a full corridor batch run: 43 real
- * parcels on Imperial Dr in Tawas City (owners DeCoster, Herig, etc., a
- * real platted subdivision) use PINs like "051-A20-000-033-00" and
- * "051-E20-000-002-00". Both forms are accepted. */
+/** Otsego PINs render canonically as "045-000-001-001-00" -- the same
+ * 5-segment NNN-NNN-NNN-NNN-NN shape as Iosco's, verified live against
+ * several real sampled parcels ("010-003-200-005-05", "045-000-001-001-00",
+ * etc., 2026-08-30). The FeatureServer's own `parcelid` field (not "TaxID"
+ * -- Otsego's schema uses a different field name than Iosco's, even though
+ * the two share the same FetchGIS hosting) already matches this canonical
+ * form, so no reformatting is needed. */
 function assertValidPin(pin: string): void {
-  if (!/^\d{3}-(?:\d{3}|[A-Z]\d{2})-\d{3}-\d{3}-\d{2}$/.test(pin)) {
-    throw new Error(
-      `Iosco adapter: "${pin}" is not a valid NNN-NNN-NNN-NNN-NN or NNN-LNN-NNN-NNN-NN PIN`
-    );
+  if (!/^\d{3}-\d{3}-\d{3}-\d{3}-\d{2}$/.test(pin)) {
+    throw new Error(`Otsego adapter: "${pin}" is not a valid NNN-NNN-NNN-NNN-NN PIN`);
   }
 }
 
 export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
   assertValidPin(pin);
   const innerQuery =
-    `f=json&where=${encodeURIComponent(`"TaxID" = '${pin}'`)}` +
-    `&returnGeometry=true&spatialRel=esriSpatialRelIntersects&outFields=TaxID,Shape_Area`;
+    `f=json&where=${encodeURIComponent(`parcelid = '${pin}'`)}` +
+    `&returnGeometry=true&spatialRel=esriSpatialRelIntersects&outFields=parcelid,Shape_Area`;
   const url = `${PROXY_BASE}${PARCEL_FEATURESERVER_QUERY_URL}?${innerQuery}`;
   const res = await fetch(url, { headers: { Referer: FETCHGIS_REFERER } });
   if (!res.ok) {
     throw new Error(
-      `Iosco FeatureServer request failed: ${res.status} ${res.statusText}`
+      `Otsego FeatureServer request failed: ${res.status} ${res.statusText}`
     );
   }
   const body = (await res.json()) as EsriQueryResponse;
+  assertNoArcgisError(body, "Otsego FeatureServer request");
   if (body.features.length === 0) {
-    throw new Error(`Iosco adapter: no parcel found for PIN "${pin}"`);
+    throw new Error(`Otsego adapter: no parcel found for PIN "${pin}"`);
   }
   const feature = body.features[0];
   const ringWgs84 = feature.geometry.rings[0].map(
@@ -75,7 +69,7 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
 
   return {
     properties: {
-      TaxID: feature.attributes.TaxID,
+      parcelid: feature.attributes.parcelid,
       Shape_Area: feature.attributes.Shape_Area,
       township,
     },
@@ -89,8 +83,6 @@ export async function fetchParcel(pin: string): Promise<RawParcelFeature> {
 export async function fetchParcelsIntersecting(
   polygon: GeoJSONPolygon
 ): Promise<RawParcelFeature[]> {
-  // toEsriRings flattens a MultiPolygon buffer (see Osceola's identical
-  // fix) into the single flat `rings` array Esri's geometry model expects.
   const geometryParam = JSON.stringify({
     rings: toEsriRings(polygon),
     spatialReference: { wkid: 4326 },
@@ -102,7 +94,7 @@ export async function fetchParcelsIntersecting(
   ): Promise<{ features: EsriQueryResponse["features"]; exceededTransferLimit: boolean }> {
     let innerQuery =
       `f=json&geometry=${encodeURIComponent(geometryParam)}&geometryType=esriGeometryPolygon` +
-      `&spatialRel=esriSpatialRelIntersects&inSR=4326&outFields=TaxID,Shape_Area` +
+      `&spatialRel=esriSpatialRelIntersects&inSR=4326&outFields=parcelid,Shape_Area` +
       `&resultOffset=${resultOffset}`;
     if (resultRecordCount !== undefined) {
       innerQuery += `&resultRecordCount=${resultRecordCount}`;
@@ -111,13 +103,11 @@ export async function fetchParcelsIntersecting(
     const res = await fetch(url, { headers: { Referer: FETCHGIS_REFERER } });
     if (!res.ok) {
       throw new Error(
-        `Iosco FeatureServer intersects request failed: ${res.status} ${res.statusText}`
+        `Otsego FeatureServer intersects request failed: ${res.status} ${res.statusText}`
       );
     }
     const body = (await res.json()) as EsriQueryResponse;
-    // ArcGIS can respond 200 with an error payload instead of a non-2xx
-    // status -- catch that before touching .features.
-    assertNoArcgisError(body, "Iosco FeatureServer intersects request");
+    assertNoArcgisError(body, "Otsego FeatureServer intersects request");
     return {
       features: body.features,
       exceededTransferLimit: body.exceededTransferLimit === true,
@@ -135,7 +125,7 @@ export async function fetchParcelsIntersecting(
     const township = await fetchTownship(centroidLng, centroidLat);
     results.push({
       properties: {
-        TaxID: feature.attributes.TaxID,
+        parcelid: feature.attributes.parcelid,
         Shape_Area: feature.attributes.Shape_Area,
         township,
       },
@@ -147,21 +137,24 @@ export async function fetchParcelsIntersecting(
 
 export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {
   const props = raw.properties;
-  const pin = String(props.TaxID);
+  const pin = String(props.parcelid);
   assertValidPin(pin);
 
   if (raw.geometry.type !== "Polygon") {
     throw new Error(
-      `Iosco adapter: expected Polygon geometry, got "${raw.geometry.type}"`
+      `Otsego adapter: expected Polygon geometry, got "${raw.geometry.type}"`
     );
   }
 
+  // Verified live 2026-08-30: Shape_Area is already in square feet (matches
+  // the layer's own precomputed AtlasAcres field to within 0.2%), not
+  // Web-Mercator square meters -- unlike some other FetchGIS-hosted layers.
   const shapeAreaSqFt = Number(props.Shape_Area);
   const acres = shapeAreaSqFt / 43560;
 
   return {
     pin,
-    county: "Iosco",
+    county: "Otsego",
     township: String(props.township),
     acres,
     geometry: {
@@ -171,8 +164,8 @@ export function normalize(raw: RawParcelFeature): NormalizedParcelRecord {
   };
 }
 
-export const ioscoAdapter: CountyParcelAdapter = {
-  county: "Iosco",
+export const otsegoAdapter: CountyParcelAdapter = {
+  county: "Otsego",
   fetchParcel,
   normalize,
   fetchParcelsIntersecting,

@@ -1,5 +1,20 @@
 import type { GeoJSONPolygon } from "../types.js";
 
+/** Exact closed-form Web Mercator (EPSG:3857) -> WGS84 (EPSG:4326) conversion.
+ * Verified bit-for-bit against DuckDB's ST_Transform. Used instead of an
+ * ArcGIS FeatureServer's own outSR=4326 conversion, which truncates every
+ * coordinate to 2 decimal degrees (~1km error) on the older-ArcGIS-Server
+ * counties (Iosco, Otsego) -- verified reproducible across geometryPrecision
+ * values 2/6/10/15 on Iosco's service, so that param has no effect there.
+ * Those services also don't support f=geojson, so this conversion always
+ * runs for them. */
+export function webMercatorToWgs84(x: number, y: number): [lng: number, lat: number] {
+  const R = 6378137.0;
+  const lng = (x / R) * (180 / Math.PI);
+  const lat = (2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) * (180 / Math.PI);
+  return [lng, lat];
+}
+
 /** Esri's geometry model represents a "multipart polygon" as one flat array
  * of rings (exterior + hole rings, distinguished by winding order) -- there
  * is no separate MultiPolygon geometry type on the wire. When a GeoJSON

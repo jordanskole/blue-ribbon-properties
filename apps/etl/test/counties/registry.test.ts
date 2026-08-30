@@ -23,6 +23,13 @@ describe("getCountyAdapter", () => {
     expect(typeof adapter.normalize).toBe("function");
   });
 
+  it("resolves the Otsego adapter", () => {
+    const adapter = getCountyAdapter("Otsego");
+    expect(adapter.county).toBe("Otsego");
+    expect(typeof adapter.fetchParcel).toBe("function");
+    expect(typeof adapter.normalize).toBe("function");
+  });
+
   it("throws a clear error for an unregistered county", () => {
     expect(() => getCountyAdapter("Wexford")).toThrow(
       'No CountyParcelAdapter registered for county "Wexford"'
