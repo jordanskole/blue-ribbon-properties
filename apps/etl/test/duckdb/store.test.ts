@@ -56,7 +56,8 @@ describe("duckdb store", () => {
   it("round-trips scalar, boolean, null, and JSON-object fields correctly", async () => {
     await insertCard(session, makeCard("10-003-013-20"));
     const reader = await session.connection.runAndReadAll(
-      `SELECT identity_acres_value, groundwater_designated_trout_stream_value,
+      `SELECT identity_acres_value, identity_acres_vintage_source_type,
+              groundwater_designated_trout_stream_value,
               groundwater_thermal_class_value,
               dry_wet_adjacency_dominant_dry_soil_value
        FROM cards WHERE parcel_id = $1`,
@@ -64,6 +65,7 @@ describe("duckdb store", () => {
     );
     const rows = reader.getRowObjectsJS();
     expect(rows[0].identity_acres_value).toBe(3.755);
+    expect(rows[0].identity_acres_vintage_source_type).toBe("continuous");
     expect(rows[0].groundwater_designated_trout_stream_value).toBe(false);
     expect(rows[0].groundwater_thermal_class_value).toBeNull();
     expect(JSON.parse(String(rows[0].dry_wet_adjacency_dominant_dry_soil_value))).toEqual({
