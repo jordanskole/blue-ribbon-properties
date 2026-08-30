@@ -89,10 +89,17 @@ describe("Blue Ribbon corridor batch, real network, real DuckDB (npm run test:in
         ).toBe(true);
       }
     },
-    600_000 // real network + real derive pipeline across every candidate parcel --
+    1_200_000 // real network + real derive pipeline across every candidate parcel --
     // live-verified 2026-08-29: this stream's 1000m buffer alone intersects
     // several hundred real Osceola parcels (not "several" as originally
     // assumed at plan time), each taking roughly 300-500ms through the full
-    // pipeline -- see task-9-report.md.
+    // pipeline -- see task-9-report.md. Bumped from 600_000 on 2026-08-30
+    // after the pagination fix (fetchAllEsriPages) made this legitimately
+    // slower: it now issues multiple sequential page requests per stream
+    // instead of one, trading speed for not silently truncating large
+    // result sets. Live-verified post-merge: a real run against this exact
+    // stream took ~1005s (839 candidates, 827 cards, the same 12 known-
+    // edge-case failures every prior run also produced) -- correct and
+    // deterministic, just slower than the original timeout's margin.
   );
 });
