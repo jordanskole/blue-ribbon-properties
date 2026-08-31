@@ -30,7 +30,10 @@ interface ParcelRow {
  * {type:"Polygon", coordinates} shape it expects, in [lng,lat] order per
  * GeoJSON, which L.geoJSON() (unlike L.polygon(), which wants [lat,lng])
  * already handles correctly. */
-export async function renderParcels(map: L.Map): Promise<Map<string, L.Layer>> {
+export async function renderParcels(
+  map: L.Map,
+  onParcelClick: (parcelId: string) => void
+): Promise<Map<string, L.Layer>> {
   const { rows } = await runQuery<ParcelRow>(
     "SELECT parcel_id, county, identity_boundary_value FROM cards"
   );
@@ -49,7 +52,9 @@ export async function renderParcels(map: L.Map): Promise<Map<string, L.Layer>> {
     const feature: GeoJSON.Feature = { type: "Feature", properties: {}, geometry };
     const layer = L.geoJSON(feature, {
       style: { color, weight: 1, fillOpacity: 0.3 },
-    }).addTo(map);
+    })
+      .on("click", () => onParcelClick(row.parcel_id))
+      .addTo(map);
     layerByPin.set(row.parcel_id, layer);
   }
 

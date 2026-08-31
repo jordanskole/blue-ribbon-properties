@@ -1,6 +1,7 @@
-import { loadParcelsTable } from "./lib/duckdb.js";
+import { loadParcelsTable, runQuery } from "./lib/duckdb.js";
 import { checkManifest } from "./lib/manifest.js";
 import { initMap, renderParcels, renderStreams } from "./lib/map.js";
+import { renderCardPanel } from "./lib/card-panel.js";
 import { computeSchemaHash } from "@brp/schema";
 
 async function bootstrap(): Promise<void> {
@@ -18,7 +19,14 @@ async function bootstrap(): Promise<void> {
   await loadParcelsTable("/data/blue-ribbon-corridor.parquet");
 
   const map = initMap("map");
-  const layerByPin = await renderParcels(map);
+  const layerByPin = await renderParcels(map, async (parcelId) => {
+    const { rows } = await runQuery(
+      `SELECT * FROM cards WHERE parcel_id = '${parcelId.replace(/'/g, "''")}'`
+    );
+    if (rows[0]) {
+      renderCardPanel(rows[0]);
+    }
+  });
   await renderStreams(map, "/data/streams.geojson");
   console.log(`Rendered ${layerByPin.size} parcel polygon(s)`);
 }
