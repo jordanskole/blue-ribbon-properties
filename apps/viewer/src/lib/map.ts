@@ -38,9 +38,13 @@ export async function renderParcels(
     "SELECT parcel_id, county, identity_boundary_value FROM cards"
   );
   const layerByPin = new Map<string, L.Layer>();
+  let skippedNullBoundary = 0;
 
   for (const row of rows) {
-    if (row.identity_boundary_value === null) continue;
+    if (row.identity_boundary_value === null) {
+      skippedNullBoundary += 1;
+      continue;
+    }
     const geometry = JSON.parse(row.identity_boundary_value);
     const color = COUNTY_COLORS[row.county] ?? DEFAULT_COLOR;
     // Typed as a local `GeoJSON.Feature` (rather than passed as an inline
@@ -56,6 +60,13 @@ export async function renderParcels(
       .on("click", () => onParcelClick(row.parcel_id))
       .addTo(map);
     layerByPin.set(row.parcel_id, layer);
+  }
+
+  if (skippedNullBoundary > 0) {
+    console.warn(
+      `renderParcels: skipped ${skippedNullBoundary} card(s) with no identity_boundary_value ` +
+        `(null boundary) and did not draw a polygon for them`
+    );
   }
 
   return layerByPin;

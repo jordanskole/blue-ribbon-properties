@@ -30,14 +30,24 @@ async function writeStreamsGeoJSON(): Promise<void> {
   const relevant = selectStreamsForCounties(BLUE_RIBBON_STREAMS_LP, ADAPTED_COUNTIES);
 
   const features = [];
+  const unresolvedStreams: string[] = [];
   for (const record of relevant) {
     const resolved = await resolveStreamGeometry(record, lpCounties);
-    if (resolved === null) continue;
+    if (resolved === null) {
+      unresolvedStreams.push(record.name);
+      continue;
+    }
     features.push({
       type: "Feature" as const,
       properties: { name: record.name, counties: record.counties },
       geometry: resolved.geometry,
     });
+  }
+  if (unresolvedStreams.length > 0) {
+    console.warn(
+      `streams.geojson: skipped ${unresolvedStreams.length} stream(s) with no resolvable ` +
+        `MiEnviro geometry: ${unresolvedStreams.join(", ")}`
+    );
   }
 
   const featureCollection = { type: "FeatureCollection" as const, features };
