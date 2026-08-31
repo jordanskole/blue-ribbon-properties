@@ -2,7 +2,7 @@
  * subset) into the #card-panel element -- the same measurements the
  * (still-deferred) MCP server's get_parcel_card would return, just shown
  * instead of returned as JSON. Grouped the same way CardDef groups them. */
-const FIELD_GROUPS: Array<{ label: string; prefix: string; fields: string[] }> = [
+export const FIELD_GROUPS: Array<{ label: string; prefix: string; fields: string[] }> = [
   { label: "Identity", prefix: "identity", fields: ["acres", "boundary"] },
   {
     label: "Groundwater (A1)",
@@ -23,7 +23,7 @@ const FIELD_GROUPS: Array<{ label: string; prefix: string; fields: string[] }> =
   { label: "Prominence (A5)", prefix: "", fields: ["prominence_ft"] },
 ];
 
-function columnPrefix(groupPrefix: string, field: string): string {
+export function columnPrefix(groupPrefix: string, field: string): string {
   return groupPrefix ? `${groupPrefix}_${field}` : field;
 }
 
