@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import type { CardDef } from "@brp/schema";
+import { CARD_COLUMNS } from "@brp/schema";
 import { openStore, hasCard, insertCard, exportParquet, type StoreSession } from "../../src/duckdb/store.js";
 
 function makeCard(parcelId: string): CardDef {
@@ -13,6 +14,14 @@ function makeCard(parcelId: string): CardDef {
       county: "Osceola",
       township: "Middle Branch",
       acres: { value: 3.755, provenance: "verified", vintage: { as_of: "2026-08-29", source_type: "continuous" } },
+      boundary: {
+        value: {
+          type: "Polygon",
+          coordinates: [[[-85.1, 44.1], [-85.099, 44.1], [-85.099, 44.101], [-85.1, 44.1]]],
+        },
+        provenance: "verified",
+        vintage: { as_of: "2026-08-29", source_type: "continuous" },
+      },
     },
     groundwater: {
       thermal_class: { value: null, provenance: "inferred", vintage: { as_of: "2026-08-29", source_type: "continuous" } },
@@ -59,7 +68,8 @@ describe("duckdb store", () => {
       `SELECT identity_acres_value, identity_acres_vintage_source_type,
               groundwater_designated_trout_stream_value,
               groundwater_thermal_class_value,
-              dry_wet_adjacency_dominant_dry_soil_value
+              dry_wet_adjacency_dominant_dry_soil_value,
+              identity_boundary_value
        FROM cards WHERE parcel_id = $1`,
       ["10-003-013-20"]
     );
@@ -72,6 +82,18 @@ describe("duckdb store", () => {
       series: "Kalkaska",
       dwelling_rating: "Slight",
     });
+    expect(JSON.parse(String(rows[0].identity_boundary_value))).toEqual({
+      type: "Polygon",
+      coordinates: [[[-85.1, 44.1], [-85.099, 44.1], [-85.099, 44.101], [-85.1, 44.1]]],
+    });
+  });
+
+  it("the live table's column order matches @brp/schema's CARD_COLUMNS exactly", async () => {
+    const reader = await session.connection.runAndReadAll(
+      `SELECT column_name FROM duckdb_columns() WHERE table_name = 'cards' ORDER BY column_index`
+    );
+    const liveColumns = reader.getRowObjectsJS().map((r) => String(r.column_name));
+    expect(liveColumns).toEqual(CARD_COLUMNS);
   });
 
   it("exports to Parquet and the export is independently readable", async () => {

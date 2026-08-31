@@ -89,6 +89,11 @@ function makeFakeCard(parcelId: string): CardDef {
         provenance: "verified",
         vintage: { as_of: "2026-08-29", source_type: "continuous" },
       },
+      boundary: {
+        value: { type: "Polygon", coordinates: [[[0, 0]]] },
+        provenance: "verified",
+        vintage: { as_of: "2026-08-29", source_type: "continuous" },
+      },
     },
     groundwater: {
       thermal_class: {

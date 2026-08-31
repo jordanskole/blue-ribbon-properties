@@ -1,3 +1,5 @@
+import type { PolygonGeometry } from "@brp/schema";
+
 export interface RawParcelFeature {
   properties: Record<string, unknown>;
   geometry: {
@@ -11,10 +13,7 @@ export interface NormalizedParcelRecord {
   county: string;
   township: string;
   acres: number;
-  geometry: {
-    type: "Polygon";
-    coordinates: number[][][];
-  };
+  geometry: PolygonGeometry;
 }
 
 // A stream buffer's own geometry can genuinely be a MultiPolygon -- see
