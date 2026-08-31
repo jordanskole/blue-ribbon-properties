@@ -1,5 +1,6 @@
-import { loadParcelsTable, runQuery } from "./lib/duckdb.js";
+import { loadParcelsTable } from "./lib/duckdb.js";
 import { checkManifest } from "./lib/manifest.js";
+import { initMap, renderParcels, renderStreams } from "./lib/map.js";
 import { computeSchemaHash } from "@brp/schema";
 
 async function bootstrap(): Promise<void> {
@@ -15,12 +16,11 @@ async function bootstrap(): Promise<void> {
   );
 
   await loadParcelsTable("/data/blue-ribbon-corridor.parquet");
-  // Note: runQuery's `rowCount` is the number of rows in the *result set*
-  // (always 1 for this aggregate query) -- the actual card count is the
-  // value of the `n` column in that single row, read from `rows` instead.
-  const { rows } = await runQuery("SELECT COUNT(*) AS n FROM cards");
-  const cardCount = Number(rows[0]?.n);
-  console.log(`duckdb-wasm loaded ${cardCount} row(s) into the cards table`);
+
+  const map = initMap("map");
+  const layerByPin = await renderParcels(map);
+  await renderStreams(map, "/data/streams.geojson");
+  console.log(`Rendered ${layerByPin.size} parcel polygon(s)`);
 }
 
 bootstrap().catch((err) => {

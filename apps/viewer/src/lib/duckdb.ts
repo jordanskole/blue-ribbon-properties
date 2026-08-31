@@ -19,17 +19,17 @@ export async function getDB(): Promise<duckdb.AsyncDuckDB> {
   return initPromise;
 }
 
-export interface QueryResult {
-  rows: Array<Record<string, unknown>>;
+export interface QueryResult<T = Record<string, unknown>> {
+  rows: T[];
   rowCount: number;
 }
 
-export async function runQuery(sql: string): Promise<QueryResult> {
+export async function runQuery<T = Record<string, unknown>>(sql: string): Promise<QueryResult<T>> {
   const db = await getDB();
   const conn = await db.connect();
   try {
     const table = await conn.query(sql);
-    const rows = table.toArray().map((row) => row.toJSON() as Record<string, unknown>);
+    const rows = table.toArray().map((row) => row.toJSON() as T);
     return { rows, rowCount: table.numRows };
   } finally {
     await conn.close();
