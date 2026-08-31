@@ -12,6 +12,14 @@ function makeCard(overrides: Partial<CardDef> = {}): CardDef {
         provenance: "verified",
         vintage: { as_of: "2026-08-27", source_type: "continuous" },
       },
+      boundary: {
+        value: {
+          type: "Polygon",
+          coordinates: [[[-85.1, 44.1], [-85.099, 44.1], [-85.099, 44.101], [-85.1, 44.1]]],
+        },
+        provenance: "verified",
+        vintage: { as_of: "2026-08-27", source_type: "continuous" },
+      },
     },
     groundwater: {
       thermal_class: {
@@ -91,6 +99,14 @@ describe("validateCard", () => {
         township: "Middle Branch",
         acres: {
           value: 3.755,
+          provenance: "verified",
+          vintage: { as_of: "2026-08-27", source_type: "continuous" },
+        },
+        boundary: {
+          value: {
+            type: "Polygon",
+            coordinates: [[[-85.1, 44.1], [-85.099, 44.1], [-85.099, 44.101], [-85.1, 44.1]]],
+          },
           provenance: "verified",
           vintage: { as_of: "2026-08-27", source_type: "continuous" },
         },

@@ -2,6 +2,7 @@ import type { CardDef } from "../../src/index.js";
 
 const SPIKE_DATE = "2026-08-27";
 const RECHECK_DATE = "2026-08-28";
+const BOUNDARY_FETCH_DATE = "2026-08-31";
 
 export const PARCEL_013_20: CardDef = {
   identity: {
@@ -12,6 +13,14 @@ export const PARCEL_013_20: CardDef = {
       value: 3.755,
       provenance: "verified",
       vintage: { as_of: SPIKE_DATE, source_type: "continuous" },
+    },
+    boundary: {
+      value: {
+        type: "Polygon",
+        coordinates: [[[-85.1273579505385, 44.0684439350181], [-85.1284054440688, 44.0685099523038], [-85.129955042651, 44.0686075970831], [-85.1299518134485, 44.0691856027079], [-85.1273538060892, 44.069180017977], [-85.1273579505385, 44.0684439350181]]],
+      },
+      provenance: "verified",
+      vintage: { as_of: BOUNDARY_FETCH_DATE, source_type: "continuous" },
     },
   },
   groundwater: {
@@ -121,6 +130,14 @@ export const PARCEL_009_00: CardDef = {
       provenance: "verified",
       vintage: { as_of: SPIKE_DATE, source_type: "continuous" },
     },
+    boundary: {
+      value: {
+        type: "Polygon",
+        coordinates: [[[-85.129955042651, 44.0686075970831], [-85.1284054403244, 44.0685099523292], [-85.1284158128495, 44.0676948301085], [-85.1297927773973, 44.0676977847693], [-85.1302116901917, 44.0682264905314], [-85.130124743978, 44.068618289395], [-85.129955042651, 44.0686075970831]]],
+      },
+      provenance: "verified",
+      vintage: { as_of: BOUNDARY_FETCH_DATE, source_type: "continuous" },
+    },
   },
   groundwater: {
     thermal_class: {
@@ -210,6 +227,14 @@ export const PARCEL_008_00: CardDef = {
       value: 10.421,
       provenance: "verified",
       vintage: { as_of: SPIKE_DATE, source_type: "continuous" },
+    },
+    boundary: {
+      value: {
+        type: "Polygon",
+        coordinates: [[[-85.1302116901917, 44.0682264905314], [-85.1297927773973, 44.0676977847693], [-85.1284158128495, 44.0676948301085], [-85.1284198600106, 44.0673767222152], [-85.1344284066139, 44.067389493376], [-85.1344504510624, 44.0674128525815], [-85.1347727876588, 44.0675174616174], [-85.1349461099323, 44.0675804701228], [-85.1351573124655, 44.0676572487045], [-85.1351595346786, 44.0678263497881], [-85.1350999215756, 44.0679869714494], [-85.1350291335998, 44.0682366789203], [-85.1302116901917, 44.0682264905314]]],
+      },
+      provenance: "verified",
+      vintage: { as_of: BOUNDARY_FETCH_DATE, source_type: "continuous" },
     },
   },
   groundwater: {

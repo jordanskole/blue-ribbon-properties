@@ -1,6 +1,8 @@
 export type { Provenance, VintageSourceType, Vintage, Field } from "./provenance.js";
 export { combineProvenance } from "./provenance.js";
 
+export type { PolygonGeometry } from "./geometry.js";
+
 export type { ParcelIdentity } from "./identity.js";
 export { validateIdentity } from "./identity.js";
 

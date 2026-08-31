@@ -1,4 +1,5 @@
 import type { Field } from "./provenance.js";
+import type { PolygonGeometry } from "./geometry.js";
 
 export interface ParcelIdentity {
   parcel_id: string; // PIN, the join key — canonical form is dash-separated groups,
@@ -10,6 +11,8 @@ export interface ParcelIdentity {
   county: string;
   township: string;
   acres: Field<number>; // wrapped: the spike found disagreeing acreage numbers for one PIN
+  boundary: Field<PolygonGeometry>; // the parcel's real boundary, from the same county
+  // FeatureServer fetch as acres — same provenance/vintage treatment.
 }
 
 // Loose on purpose: PIN segment counts and widths vary by county (verified
@@ -41,6 +44,20 @@ export function validateIdentity(identity: ParcelIdentity): string[] {
   }
   if (identity.acres.value !== null && identity.acres.value <= 0) {
     errors.push(`acres.value must be positive, got ${identity.acres.value}`);
+  }
+  const boundary = identity.boundary.value;
+  if (boundary !== null) {
+    if ((boundary as { type: string }).type !== "Polygon") {
+      errors.push(
+        `boundary.value.type must be "Polygon", got "${(boundary as { type: string }).type}"`
+      );
+    } else if (
+      !Array.isArray(boundary.coordinates) ||
+      boundary.coordinates.length === 0 ||
+      boundary.coordinates[0].length === 0
+    ) {
+      errors.push("boundary.value.coordinates must contain at least one non-empty ring");
+    }
   }
 
   return errors;
