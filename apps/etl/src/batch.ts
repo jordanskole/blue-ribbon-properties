@@ -8,18 +8,21 @@ import {
   computeIntersectingCounties,
   loadCountiesForIntersectionCheck,
 } from "./duckdb/buffer.js";
-import { getCountyAdapter } from "./counties/registry.js";
+import { COUNTY_REGISTRY, getCountyAdapter } from "./counties/registry.js";
 import { deriveCardForParcel } from "./index.js";
 import { openStore, hasCard, insertCard, exportParquet, closeStore } from "./duckdb/store.js";
 
 const BUFFER_METERS = 1000;
-// The real current set of counties with a working adapter — Otsego and
-// Manistee shipped but this constant was never updated, so a default
-// (no explicit `options.counties`) batch run silently never included them.
-// Confirmed live 2026-08-31: the store on disk had zero Otsego/Manistee
-// cards despite both adapters having passing real-network integration
-// tests for months.
-const CORRIDOR_COUNTIES = ["Osceola", "Iosco", "Roscommon", "Otsego", "Manistee"];
+// The corridor county list is derived from COUNTY_REGISTRY (the real source
+// of truth for which counties have a working adapter) rather than
+// hand-copied here. A hand-copied version of this exact list (Otsego and
+// Manistee shipped but the copy was never updated) silently excluded both
+// from every default batch run for months -- confirmed live 2026-08-31, zero
+// Otsego/Manistee cards in the store despite both adapters having passing
+// real-network integration tests. Deriving from the registry makes that
+// class of drift structurally impossible: a new adapter is picked up the
+// moment it's added to COUNTY_REGISTRY.
+const CORRIDOR_COUNTIES = Object.keys(COUNTY_REGISTRY);
 
 export interface BlueRibbonBatchOptions {
   /** Restrict to these counties (default: all 5 corridor counties). */

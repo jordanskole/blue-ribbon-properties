@@ -75,6 +75,11 @@ const fakeAdapter = {
 };
 
 vi.mock("../src/counties/registry.js", () => ({
+  // batch.ts derives its default corridor-county list from
+  // Object.keys(COUNTY_REGISTRY) at module load time, so the mock must
+  // supply an object even though every test here passes an explicit
+  // `options.counties` and never relies on the default.
+  COUNTY_REGISTRY: { Osceola: fakeAdapter },
   getCountyAdapter: vi.fn(() => fakeAdapter),
 }));
 

@@ -3,8 +3,14 @@ import { copyParquet, writeManifest } from "./export-viewer-data.js";
 import { BLUE_RIBBON_STREAMS_LP, type BlueRibbonStreamRecord } from "./data/blue-ribbon-streams.js";
 import { fetchLowerPeninsulaCounties } from "./fetch/county-boundaries.js";
 import { resolveStreamGeometry } from "./fetch/blue-ribbon-geometry.js";
+import { COUNTY_REGISTRY } from "./counties/registry.js";
 
-const ADAPTED_COUNTIES = ["Osceola", "Iosco", "Roscommon", "Otsego", "Manistee"];
+// Derived from COUNTY_REGISTRY (the real source of truth for which counties
+// have a working adapter) rather than hand-copied, so this list can never
+// silently drift out of sync the way a hand-copied version of the same list
+// already has elsewhere in this codebase (see batch.ts's CORRIDOR_COUNTIES
+// history).
+const ADAPTED_COUNTIES = Object.keys(COUNTY_REGISTRY);
 const STORE_DUCKDB_PATH = "./store/blue-ribbon-corridor.duckdb";
 const STORE_PARQUET_PATH = "./store/blue-ribbon-corridor.parquet";
 const OUT_DIR = "../viewer/public/data";
