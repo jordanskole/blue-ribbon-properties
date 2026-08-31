@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { normalize, fetchParcelsIntersecting } from "../../src/counties/otsego.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
-import type { RequestInit } from "node:fetch";
 
 function makeRawFeature(
   propertyOverrides: Record<string, unknown> = {}
