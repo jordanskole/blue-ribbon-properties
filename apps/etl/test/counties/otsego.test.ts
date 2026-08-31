@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { normalize, fetchParcelsIntersecting } from "../../src/counties/otsego.js";
 import type { RawParcelFeature } from "../../src/counties/types.js";
+import type { RequestInit } from "node:fetch";
 
 function makeRawFeature(
   propertyOverrides: Record<string, unknown> = {}
@@ -76,12 +77,16 @@ describe("otsego fetchParcelsIntersecting", () => {
       ],
     };
     const mcdResponse = { features: [{ attributes: { Name: "Vanderbilt" } }] };
+    let parcelQueryUrl = "";
+    let parcelQueryInit: RequestInit | undefined;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
         if (url.includes("MinorCivilDivision")) {
           return { ok: true, json: async () => mcdResponse };
         }
+        parcelQueryUrl = url;
+        parcelQueryInit = init;
         return { ok: true, json: async () => queryResponse };
       })
     );
@@ -94,6 +99,17 @@ describe("otsego fetchParcelsIntersecting", () => {
     expect(features[0].properties.parcelid).toBe("045-000-001-001-00");
     expect(features[0].properties.township).toBe("Vanderbilt");
     expect(features[0].geometry.type).toBe("Polygon");
+    // Parcel query parameters travel in the body, not the URL (after the proxy base).
+    // The URL follows the proxy pattern: proxy.ashx?targetUrl -- no additional params.
+    expect(parcelQueryUrl).toMatch(/proxy\.ashx\?https:\/\/app\.fetchgis\.com\/geoservices\/fgis\/otsParcels\/FeatureServer\/0\/query$/);
+    expect(parcelQueryInit?.method).toBe("POST");
+    expect(parcelQueryInit?.headers).toEqual({
+      "Content-Type": "application/x-www-form-urlencoded",
+      Referer: "https://app.fetchgis.com/?currentMap=otsego",
+    });
+    const body = String(parcelQueryInit?.body);
+    expect(body).toContain("geometryType=esriGeometryPolygon");
+    expect(body).toContain("spatialRel=esriSpatialRelIntersects");
   });
 
   it("returns an empty array when nothing intersects, without erroring", async () => {
