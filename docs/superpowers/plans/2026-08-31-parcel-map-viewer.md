@@ -1413,8 +1413,6 @@ git commit -m "chore(viewer): scaffold apps/viewer (Vite + TypeScript, no framew
 - Create: `apps/viewer/src/lib/manifest.ts`
 - Create: `apps/viewer/test/manifest.test.ts`
 - Modify: `apps/viewer/src/main.ts`
-- Modify: `apps/viewer/package.json` (test script needs a DOM/fetch-capable environment —
-  see step 5)
 
 **Interfaces:**
 - Consumes: `computeSchemaHash` from `@brp/schema`.
