@@ -137,12 +137,12 @@ describe("otsego fetchParcelsIntersecting", () => {
     const seenOffsets: string[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
         if (url.includes("MinorCivilDivision")) {
           return { ok: true, json: async () => mcdResponse };
         }
-        const match = url.match(/resultOffset=(\d+)/);
-        const offset = match![1];
+        const params = new URLSearchParams(String(init?.body));
+        const offset = params.get("resultOffset")!;
         seenOffsets.push(offset);
         return { ok: true, json: async () => (offset === "0" ? page1 : page2) };
       })
