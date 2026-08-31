@@ -129,6 +129,11 @@ export function deriveCard(input: DeriveInput): CardDef {
         provenance: "verified",
         vintage: { as_of: input.fetchedAt, source_type: "continuous" },
       },
+      boundary: {
+        value: input.parcel.geometry,
+        provenance: "verified",
+        vintage: { as_of: input.fetchedAt, source_type: "continuous" },
+      },
     },
     groundwater: {
       thermal_class: {

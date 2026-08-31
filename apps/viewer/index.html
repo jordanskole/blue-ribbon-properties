@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blue Ribbon Properties — Parcel Map</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      html, body, #map { height: 100%; margin: 0; }
+      #card-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 380px;
+        height: 100%;
+        overflow-y: auto;
+        background: white;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+        padding: 16px;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="card-panel"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

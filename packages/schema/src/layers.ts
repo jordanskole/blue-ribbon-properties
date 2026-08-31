@@ -66,7 +66,13 @@ export const LAYER_REGISTRY: readonly LayerDef[] = [
     source: "per-county — see county configuration, not a single fixed endpoint",
     geometry_type: "polygon",
     source_type: "continuous",
-    feeds: ["identity.parcel_id", "identity.county", "identity.township", "identity.acres"],
+    feeds: [
+      "identity.parcel_id",
+      "identity.county",
+      "identity.township",
+      "identity.acres",
+      "identity.boundary",
+    ],
   },
   {
     id: "mgf_minor_civil_division",

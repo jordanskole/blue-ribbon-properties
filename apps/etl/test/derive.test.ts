@@ -102,6 +102,7 @@ describe("deriveCard", () => {
       fetchedAt: "2026-08-28",
     });
     expect(validateCard(card)).toEqual([]);
+    expect(card.identity.boundary.value).toEqual(PARCEL.geometry);
   });
 
   it("populates dry_wet_adjacency and dominant_dry_soil from the soil summary", () => {

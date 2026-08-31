@@ -17,6 +17,7 @@ const VALID_CARD_FIELD_PATHS = new Set<string>([
   "identity.county",
   "identity.township",
   "identity.acres",
+  "identity.boundary",
 
   // groundwater.* (GroundwaterExpression) — A1
   "groundwater.thermal_class",

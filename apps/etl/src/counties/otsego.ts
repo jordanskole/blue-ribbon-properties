@@ -92,15 +92,34 @@ export async function fetchParcelsIntersecting(
     resultOffset: number,
     resultRecordCount: number | undefined
   ): Promise<{ features: EsriQueryResponse["features"]; exceededTransferLimit: boolean }> {
-    let innerQuery =
-      `f=json&geometry=${encodeURIComponent(geometryParam)}&geometryType=esriGeometryPolygon` +
-      `&spatialRel=esriSpatialRelIntersects&inSR=4326&outFields=parcelid,Shape_Area` +
-      `&resultOffset=${resultOffset}`;
+    const params: Record<string, string> = {
+      f: "json",
+      geometry: geometryParam,
+      geometryType: "esriGeometryPolygon",
+      spatialRel: "esriSpatialRelIntersects",
+      inSR: "4326",
+      outFields: "parcelid,Shape_Area",
+      resultOffset: String(resultOffset),
+    };
     if (resultRecordCount !== undefined) {
-      innerQuery += `&resultRecordCount=${resultRecordCount}`;
+      params.resultRecordCount = String(resultRecordCount);
     }
-    const url = `${PROXY_BASE}${PARCEL_FEATURESERVER_QUERY_URL}?${innerQuery}`;
-    const res = await fetch(url, { headers: { Referer: FETCHGIS_REFERER } });
+    // POST, not GET -- same fix as Osceola/Roscommon's identical pattern: a
+    // real corridor buffer's geometry parameter overflows a GET URL's length
+    // limit (live-verified 2026-08-31 against this exact proxy+FeatureServer:
+    // a full-run Otsego stream buffer produced "414 Request-URI Too Long"
+    // through the FetchGIS proxy). The proxy forwards a POST body to the
+    // target URL just like it forwards GET query params -- live-verified
+    // 2026-08-31 with a small test polygon before relying on it here.
+    const url = `${PROXY_BASE}${PARCEL_FEATURESERVER_QUERY_URL}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Referer: FETCHGIS_REFERER,
+      },
+      body: new URLSearchParams(params).toString(),
+    });
     if (!res.ok) {
       throw new Error(
         `Otsego FeatureServer intersects request failed: ${res.status} ${res.statusText}`

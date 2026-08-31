@@ -25,6 +25,8 @@ describe("Roscommon target parcel, real network, real DuckDB (npm run test:integ
       // small platted subdivision lot, consistent with the county's own
       // (integer-truncated) Acres field reading 0.
       expect(card.identity.acres.value).toBeCloseTo(0.132, 2);
+      expect(card.identity.boundary.value?.type).toBe("Polygon");
+      expect(card.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
     },
     30_000 // real network calls -- generous timeout
   );

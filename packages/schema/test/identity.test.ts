@@ -11,6 +11,14 @@ function makeIdentity(overrides: Partial<ParcelIdentity> = {}): ParcelIdentity {
       provenance: "verified",
       vintage: { as_of: "2026-08-27", source_type: "continuous" },
     },
+    boundary: {
+      value: {
+        type: "Polygon",
+        coordinates: [[[-85.1, 44.1], [-85.099, 44.1], [-85.099, 44.101], [-85.1, 44.1]]],
+      },
+      provenance: "verified",
+      vintage: { as_of: "2026-08-27", source_type: "continuous" },
+    },
     ...overrides,
   };
 }
@@ -87,6 +95,45 @@ describe("validateIdentity", () => {
     const errors = validateIdentity(
       makeIdentity({
         acres: {
+          value: null,
+          provenance: "inferred",
+          vintage: { as_of: "2026-08-27", source_type: "continuous", note: "not yet sourced" },
+        },
+      })
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects a boundary whose value.type is not \"Polygon\"", () => {
+    const errors = validateIdentity(
+      makeIdentity({
+        boundary: {
+          value: { type: "MultiPolygon", coordinates: [] } as never,
+          provenance: "verified",
+          vintage: { as_of: "2026-08-27", source_type: "continuous" },
+        },
+      })
+    );
+    expect(errors).toContain('boundary.value.type must be "Polygon", got "MultiPolygon"');
+  });
+
+  it("rejects a boundary with an empty coordinate ring", () => {
+    const errors = validateIdentity(
+      makeIdentity({
+        boundary: {
+          value: { type: "Polygon", coordinates: [] },
+          provenance: "verified",
+          vintage: { as_of: "2026-08-27", source_type: "continuous" },
+        },
+      })
+    );
+    expect(errors).toContain("boundary.value.coordinates must contain at least one non-empty ring");
+  });
+
+  it("allows a null boundary.value without an error", () => {
+    const errors = validateIdentity(
+      makeIdentity({
+        boundary: {
           value: null,
           provenance: "inferred",
           vintage: { as_of: "2026-08-27", source_type: "continuous", note: "not yet sourced" },

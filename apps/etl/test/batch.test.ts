@@ -75,6 +75,11 @@ const fakeAdapter = {
 };
 
 vi.mock("../src/counties/registry.js", () => ({
+  // batch.ts derives its default corridor-county list from
+  // Object.keys(COUNTY_REGISTRY) at module load time, so the mock must
+  // supply an object even though every test here passes an explicit
+  // `options.counties` and never relies on the default.
+  COUNTY_REGISTRY: { Osceola: fakeAdapter },
   getCountyAdapter: vi.fn(() => fakeAdapter),
 }));
 
@@ -86,6 +91,11 @@ function makeFakeCard(parcelId: string): CardDef {
       township: "Middle Branch",
       acres: {
         value: 3.755,
+        provenance: "verified",
+        vintage: { as_of: "2026-08-29", source_type: "continuous" },
+      },
+      boundary: {
+        value: { type: "Polygon", coordinates: [[[0, 0]]] },
         provenance: "verified",
         vintage: { as_of: "2026-08-29", source_type: "continuous" },
       },

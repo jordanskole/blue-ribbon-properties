@@ -20,6 +20,8 @@ describe("Iosco target parcel, real network, real DuckDB (npm run test:integrati
       // reprojected geometry; cross-checked against the FeatureServer's own
       // Shape_Area (sq ft) to within 0.1% during design.
       expect(card.identity.acres.value).toBeCloseTo(8.51, 1);
+      expect(card.identity.boundary.value?.type).toBe("Polygon");
+      expect(card.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
 
       // dry_acres + wet_acres reconciling with identity.acres is already
       // covered by validateCard() above.

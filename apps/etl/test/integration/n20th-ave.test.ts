@@ -30,16 +30,24 @@ describe("N 20th Ave, real network, real DuckDB (npm run test:integration)", () 
         PARCEL_013_20.identity.acres.value!,
         2
       );
+      expect(card013.identity.boundary.value?.type).toBe("Polygon");
+      expect(card013.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
+
       expect(card009.identity.parcel_id).toBe(PARCEL_009_00.identity.parcel_id);
       expect(card009.identity.acres.value).toBeCloseTo(
         PARCEL_009_00.identity.acres.value!,
         2
       );
+      expect(card009.identity.boundary.value?.type).toBe("Polygon");
+      expect(card009.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
+
       expect(card008.identity.parcel_id).toBe(PARCEL_008_00.identity.parcel_id);
       expect(card008.identity.acres.value).toBeCloseTo(
         PARCEL_008_00.identity.acres.value!,
         2
       );
+      expect(card008.identity.boundary.value?.type).toBe("Polygon");
+      expect(card008.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
 
       // A1 -- thermal_class is null on all three (corrected 2026-08-28);
       // designated_trout_stream is true on 008-00 only.
