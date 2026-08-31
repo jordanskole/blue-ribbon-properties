@@ -22,6 +22,8 @@ describe("Manistee target parcel, real network, real DuckDB (npm run test:integr
       // overstates it by ~2x, a Web Mercator area-inflation artifact at this
       // latitude -- see the comment in normalize()).
       expect(card.identity.acres.value).toBeCloseTo(14.86, 1);
+      expect(card.identity.boundary.value?.type).toBe("Polygon");
+      expect(card.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
       expect(card.identity.township.length).toBeGreaterThan(0);
     },
     30_000 // real network calls -- generous timeout

@@ -20,6 +20,8 @@ describe("Otsego target parcel, real network, real DuckDB (npm run test:integrat
       // cross-checked live against the FeatureServer's own AtlasAcres field
       // (0.396816...) to within 0.2%.
       expect(card.identity.acres.value).toBeCloseTo(0.397, 2);
+      expect(card.identity.boundary.value?.type).toBe("Polygon");
+      expect(card.identity.boundary.value?.coordinates[0].length).toBeGreaterThan(0);
       expect(card.identity.township.length).toBeGreaterThan(0);
     },
     30_000 // real network calls -- generous timeout
